@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Sales - Aviation ERP</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Select2 for searchable dropdown -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
+    <!-- Custom styles -->
+    <style>
+        /* Select2 mobile optimization */
+        .select2-container {
+            width: 100% !important;
+        }
+        .select2-container--default .select2-selection--single {
+            height: 48px;
+            padding: 12px 16px;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 48px;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 24px;
+            padding-left: 0;
+        }
+        
+        /* Stock status badges */
+        .stock-badge {
+            transition: all 0.3s ease;
+        }
+        .stock-badge.in-stock {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #22c55e;
+        }
+        .stock-badge.low-stock {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+        }
+        .stock-badge.out-of-stock {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+        
+        /* Kit preview animation */
+        #kit-preview {
+            transition: all 0.3s ease-in-out;
+        }
+        #kit-preview.hidden {
+            display: none;
+        }
+        
+        /* Input focus states */
+        input:focus, select:focus {
+            outline: none;
+            ring: 2px;
+            ring-color: #3b82f6;
+        }
+        
+        /* Read-only fields */
+        .read-only-field {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            cursor: not-allowed;
+        }
+        
+        /* Mobile touch targets */
+        @media (max-width: 640px) {
+            .form-group-mobile {
+                margin-bottom: 1rem;
+            }
+            .btn-mobile {
+                padding: 0.75rem 1rem;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-6 max-w-2xl">
+        
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-900">New Sale</h1>
+            <p class="text-sm text-gray-500">Enter sale details below</p>
+        </div>
+
+        <!-- Sales Form -->
+        <form id="sales-form" class="bg-white rounded-lg shadow-md p-6 space-y-5">
+            
+            <!-- Product Selection (Searchable Dropdown) -->
+            <div class="form-group-mobile">
+                <label for="product" class="block text-sm font-medium text-gray-700 mb-2">
+                    Select Product <span class="text-red-500">*</span>
+                </label>
+                <select id="product" name="product" class="select2-product w-full" required>
+                    <option value="">-- Search Products --</option>
+                    <!-- Products will be loaded via JavaScript -->
+                </select>
+                <p class="text-xs text-gray-400 mt-1">Type to search 149 products</p>
+            </div>
+
+            <!-- Stock Status Badge -->
+            <div class="form-group-mobile">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Stock Status</label>
+                <div id="stock-badge" class="stock-badge inline-flex items-center px-4 py-2 rounded-full text-sm font-medium">
+                    <span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                    Select a product
+                </div>
+                <p id="stock-info" class="text-sm text-gray-500 mt-1">--</p>
+            </div>
+
+            <!-- Unit Type Toggle -->
+            <div class="form-group-mobile">
+                <label for="unit" class="block text-sm font-medium text-gray-700 mb-2">
+                    Unit Type <span class="text-red-500">*</span>
+                </label>
+                <select id="unit" name="unit" class="w-full h-12 px-4 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    <option value="lts">Lts (Liters)</option>
+                    <option value="kg">Kg (Kilograms)</option>
+                    <option value="yards">Yards</option>
+                    <option value="inches">Inches</option>
+                    <option value="meters">Meters</option>
+                </select>
+            </div>
+
+            <!-- Quantity Input -->
+            <div class="form-group-mobile">
+                <label for="quantity" class="block text-sm font-medium text-gray-700 mb-2">
+                    Quantity <span class="text-red-500">*</span>
+                </label>
+                <input 
+                    type="number" 
+                    id="quantity" 
+                    name="quantity" 
+                    min="0.01" 
+                    step="0.01"
+                    class="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter quantity"
+                    required
+                >
+            </div>
+
+            <!-- Kit Preview Section (Hidden unless is_kit is true) -->
+            <div id="kit-preview" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-center mb-3">
+                    <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                    </svg>
+                    <span class="text-sm font-semibold text-blue-800">Kit Components Preview</span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Hardener Required</label>
+                        <input 
+                            type="text" 
+                            id="hardener_required" 
+                            class="read-only-field w-full px-3 py-2 rounded text-sm"
+                            placeholder="Auto-calculated"
+                            readonly
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Thinner Required</label>
+                        <input 
+                            type="text" 
+                            id="thinner_required" 
+                            class="read-only-field w-full px-3 py-2 rounded text-sm"
+                            placeholder="Auto-calculated"
+                            readonly
+                        >
+                    </div>
+                </div>
+                
+                <p class="text-xs text-blue-600 mt-2">
+                    <span class="font-medium">Note:</span> Kit quantities are calculated based on mixing ratio
+                </p>
+            </div>
+
+            <!-- Carpet Preview (Hidden unless category is Carpet and unit is Yards) -->
+            <div id="carpet-preview" class="hidden bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="flex items-center mb-3">
+                    <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                    </svg>
+                    <span class="text-sm font-semibold text-green-800">Carpet Calculation Preview</span>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Total Meters to be Deducted</label>
+                    <input 
+                        type="text" 
+                        id="meters_to_deduct" 
+                        class="read-only-field w-full px-3 py-2 rounded text-sm bg-green-100 border-green-300"
+                        placeholder="Includes 5% wastage"
+                        readonly
+                    >
+                    <p class="text-xs text-green-600 mt-1">Includes 5% aviation cutting wastage</p>
+                </div>
+            </div>
+
+            <!-- Stock Warning Message -->
+            <div id="stock-warning" class="hidden p-4 rounded-lg">
+                <div class="flex items-center">
+                    <svg id="warning-icon" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <span id="warning-text" class="text-sm font-medium"></span>
+                </div>
+            </div>
+
+            <!-- PO Number -->
+            <div class="form-group-mobile">
+                <label for="po_number" class="block text-sm font-medium text-gray-700 mb-2">
+                    Purchase Order (PO) Number
+                </label>
+                <input 
+                    type="text" 
+                    id="po_number" 
+                    name="po_number" 
+                    class="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter PO number (optional)"
+                >
+            </div>
+
+            <!-- Delivery Note Number -->
+            <div class="form-group-mobile">
+                <label for="dn_number" class="block text-sm font-medium text-gray-700 mb-2">
+                    Delivery Note (DN) Number
+                </label>
+                <input 
+                    type="text" 
+                    id="dn_number" 
+                    name="dn_number" 
+                    class="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter DN number (optional)"
+                >
+            </div>
+
+            <!-- Notes -->
+            <div class="form-group-mobile">
+                <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">
+                    Notes
+                </label>
+                <textarea 
+                    id="notes" 
+                    name="notes" 
+                    rows="3"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Additional notes (optional)"
+                ></textarea>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-2">
+                <button 
+                    type="submit" 
+                    id="confirm_sale_btn"
+                    disabled
+                    class="w-full btn-mobile bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center"
+                >
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Confirm Sale
+                </button>
+                <p id="button-hint" class="text-center text-xs text-gray-400 mt-2">
+                    Select a product and enter quantity to enable
+                </p>
+            </div>
+        </form>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 flex items-center">
+                <svg class="animate-spin h-8 w-8 text-blue-600 mr-3" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-gray-700">Processing...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- jQuery (required for Select2) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <!-- Select2 -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    <!-- Handle Sale Input Script -->
+    <script src="handleSaleInput.js"></script>
+
+    <!-- Application Script -->
+    <script>
+        // Global state
+        let productsCache = [];
+        let currentProduct = null;
+
+        // Initialize on page load
+        $(document).ready(function() {
+            initializeApp();
+        });
+
+        async function initializeApp() {
+            try {
+                // Load products
+                await loadProducts();
+                
+                // Initialize Select2
+                initializeSelect2();
+                
+                // Setup event listeners
+                setupEventListeners();
+                
+                console.log('Staff Sales Form initialized successfully!');
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                showError('Failed to load products. Please refresh the page.');
+            }
+        }
+
+        async function loadProducts() {
+            try {
+                const response = await fetch('/api/products?limit=200');
+                if (!response.ok) throw new Error('Failed to fetch products');
+                
+                const products = await response.json();
+                productsCache = products;
+                
+                // Populate select options
+                const $select = $('#product');
+                $select.empty();
+                $select.append('<option value="">-- Search Products --</option>');
+                
+                products.forEach(product => {
+                    const isKit = product.is_kit ? ' [KIT]' : '';
+                    const stock = product.current_stock_level || 0;
+                    const stockStatus = stock > 10 ? '✓' : stock > 0 ? '!' : '✗';
+                    
+                    $select.append(
+                        `<option value="${product.id}" 
+                                data-name="${product.name}" 
+                                data-sku="${product.sku}"
+                                data-is-kit="${product.is_kit}"
+                                data-stock="${stock}"
+                                data-mixing-ratio="${escapeHtml(JSON.stringify(product.mixing_ratio || {}))}"
+                                data-category="${escapeHtml(product.category_name || '')}">
+                            ${stockStatus} ${product.name}${isKit} (${product.sku})
+                        </option>`
+                    );
+                });
+                
+                console.log(`Loaded ${products.length} products`);
+            } catch (error) {
+                console.error('Error loading products:', error);
+                throw error;
+            }
+        }
+
+        function initializeSelect2() {
+            $('#product').select2({
+                placeholder: 'Search 149 products...',
+                allowClear: true,
+                minimumInputLength: 1,
+                language: {
+                    noResults: function() {
+                        return 'No products found';
+                    },
+                    searching: function() {
+                        return 'Searching...';
+                    }
+                },
+                templateResult: function(product) {
+                    if (!product.id) return product.text;
+                    
+                    const $option = $(product.element);
+                    const stock = $option.data('stock') || 0;
+                    const isKit = $option.data('is-kit');
+                    
+                    let stockClass = 'text-green-600';
+                    if (stock === 0) stockClass = 'text-red-600';
+                    else if (stock < 10) stockClass = 'text-yellow-600';
+                    
+                    const kitBadge = isKit ? '<span class="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">KIT</span>' : '';
+                    
+                    return $(`
+                        <div class="flex justify-between items-center">
+                            <span>${product.text}${kitBadge}</span>
+                            <span class="text-xs ${stockClass}">Stock: ${stock}</span>
+                        </div>
+                    `);
+                }
+            });
+        }
+
+        function setupEventListeners() {
+            // Product selection change
+            $('#product').on('change', async function(e) {
+                const productId = $(this).val();
+                
+                if (!productId) {
+                    resetForm();
+                    return;
+                }
+                
+                // Get product data from cache
+                const product = productsCache.find(p => p.id === productId);
+                if (product) {
+                    currentProduct = product;
+                    updateStockBadge(product);
+                    handleProductChange(product);
+                }
+            });
+
+            // Unit type change
+            $('#unit').on('change', function() {
+                if (currentProduct && $('#quantity').val()) {
+                    triggerCalculation();
+                }
+            });
+
+            // Quantity input
+            $('#quantity').on('input', function() {
+                if (currentProduct && $(this).val()) {
+                    triggerCalculation();
+                }
+            });
+
+            // Form submission
+            $('#sales-form').on('submit', async function(e) {
+                e.preventDefault();
+                await submitSale();
+            });
+        }
+
+        function handleProductChange(product) {
+            const isKit = product.is_kit === true || product.is_kit === 'true';
+            
+            // Show/hide kit preview
+            if (isKit) {
+                $('#kit-preview').removeClass('hidden');
+                $('#carpet-preview').addClass('hidden');
+            } else {
+                $('#kit-preview').addClass('hidden');
+                
+                // Check if carpet
+                const categoryName = product.category_name || '';
+                const isCarpet = categoryName.toLowerCase().includes('carpet');
+                const unit = $('#unit').val();
+                
+                if (isCarpet && (unit === 'yards' || unit === 'yd')) {
+                    $('#carpet-preview').removeClass('hidden');
+                } else {
+                    $('#carpet-preview').addClass('hidden');
+                }
+            }
+            
+            // Trigger calculation if quantity is entered
+            if ($('#quantity').val()) {
+                triggerCalculation();
+            }
+        }
+
+        function triggerCalculation() {
+            const quantity = parseFloat($('#quantity').val()) || 0;
+            const unitSelected = $('#unit').val();
+            
+            // Prepare elements object for handleSaleInput
+            const elements = {
+                hardenerRequired: 'hardener_required',
+                thinnerRequired: 'thinner_required',
+                metersToDeduct: 'meters_to_deduct',
+                confirmButton: 'confirm_sale_btn',
+                stockWarning: 'stock_warning'
+            };
+            
+            handleSaleInput({
+                product: currentProduct,
+                quantity: quantity,
+                unitSelected: unitSelected,
+                elements: elements
+            });
+        }
+
+        function updateStockBadge(product) {
+            const stock = product.current_stock_level || 0;
+            const $badge = $('#stock-badge');
+            const $info = $('#stock-info');
+            
+            $badge.removeClass('in-stock low-stock out-of-stock');
+            
+            let statusText, statusClass, iconColor;
+            
+            if (stock === 0) {
+                statusText = 'Out of Stock';
+                statusClass = 'out-of-stock';
+                iconColor = 'bg-red-500';
+            } else if (stock < 10) {
+                statusText = `Low Stock (${stock})`;
+                statusClass = 'low-stock';
+                iconColor = 'bg-yellow-500';
+            } else {
+                statusText = `In Stock (${stock})`;
+                statusClass = 'in-stock';
+                iconColor = 'bg-green-500';
+            }
+            
+            $badge.addClass(statusClass);
+            $badge.html(`<span class="w-2 h-2 ${iconColor} rounded-full mr-2"></span>${statusText}`);
+            
+            // Update stock info
+            const unitSymbol = product.unit_symbol || 'units';
+            $info.text(`${stock} ${unitSymbol} available`);
+        }
+
+        function resetForm() {
+            currentProduct = null;
+            
+            // Reset stock badge
+            $('#stock-badge').attr('class', 'stock-badge inline-flex items-center px-4 py-2 rounded-full text-sm font-medium');
+            $('#stock-badge').html('<span class="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>Select a product');
+            $('#stock-info').text('--');
+            
+            // Hide previews
+            $('#kit-preview').addClass('hidden');
+            $('#carpet-preview').addClass('hidden');
+            
+            // Clear inputs
+            $('#hardener_required').val('');
+            $('#thinner_required').val('');
+            $('#meters_to_deduct').val('');
+            $('#stock-warning').addClass('hidden');
+            
+            // Disable button
+            $('#confirm_sale_btn').prop('disabled', true);
+            $('#button-hint').text('Select a product and enter quantity to enable');
+        }
+
+        async function submitSale() {
+            const productId = $('#product').val();
+            const quantity = parseFloat($('#quantity').val());
+            const unitSelected = $('#unit').val();
+            const poNumber = $('#po_number').val();
+            const dnNumber = $('#dn_number').val();
+            const notes = $('#notes').val();
+            
+            if (!productId || !quantity) {
+                showError('Please fill in all required fields');
+                return;
+            }
+            
+            // Show loading
+            $('#loading').removeClass('hidden');
+            
+            try {
+                const response = await fetch('/sales/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        requested_qty: quantity,
+                        unit_selected: unitSelected,
+                        is_kit: currentProduct.is_kit,
+                        staff_id: 'staff-uuid-placeholder', // Replace with actual staff ID
+                        reference_type: 'sale',
+                        notes: notes || undefined
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Sale failed');
+                }
+                
+                // Success
+                alert('Sale completed successfully!');
+                $('#sales-form')[0].reset();
+                resetForm();
+                $('#product').val(null).trigger('change');
+                
+            } catch (error) {
+                console.error('Sale error:', error);
+                showError(error.message || 'Failed to process sale');
+            } finally {
+                $('#loading').addClass('hidden');
+            }
+        }
+
+        function showError(message) {
+            const $warning = $('#stock-warning');
+            $warning.removeClass('hidden bg-green-100 border-green-400 text-green-700');
+            $warning.addClass('bg-red-100 border-red-400 text-red-700');
+            $('#warning-icon').attr('class', 'w-5 h-5 mr-2 text-red-500');
+            $('#warning-text').text(message);
+        }
+
+        function showSuccess(message) {
+            const $warning = $('#stock-warning');
+            $warning.removeClass('hidden bg-red-100 border-red-400 text-red-700');
+            $warning.addClass('bg-green-100 border-green-400 text-green-700');
+            $('#warning-icon').attr('class', 'w-5 h-5 mr-2 text-green-500');
+            $('#warning-text').text(message);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Expose reset function globally for testing
+        window.resetSalesForm = resetForm;
+    </script>
+</body>
+</html>
+
