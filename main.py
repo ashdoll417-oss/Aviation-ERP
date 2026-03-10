@@ -93,6 +93,27 @@ class InventoryResponse(BaseModel):
 # HELPER FUNCTIONS
 # =============================================================================
 
+def get_greeting() -> str:
+    """
+    Get time-based greeting in Nairobi timezone.
+    
+    Returns:
+        String with appropriate greeting based on time of day
+    """
+    nairobi_tz = pytz.timezone('Africa/Nairobi')
+    current_hour = datetime.now(nairobi_tz).hour
+    
+    # 05:00-11:59 = Good Morning
+    # 12:00-17:59 = Good Afternoon
+    # Otherwise (18:00-04:59) = Good Evening
+    if 5 <= current_hour < 12:
+        return "Good Morning, AISL Aviation Team"
+    elif 12 <= current_hour < 18:
+        return "Good Afternoon"
+    else:
+        return "Good Evening"
+
+
 def is_paint_kit(description: str, uom: str) -> bool:
     """
     Check if the product is a paint kit.
@@ -401,6 +422,171 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat()
     }
+
+
+# =============================================================================
+# PAGE ROUTES WITH TEMPLATES
+# =============================================================================
+
+@app.get("/stock")
+async def stock_page(request: Request):
+    """
+    Stock Management page - renders stock.html with inventory data.
+    Includes Manual Entry Form at the top.
+    """
+    supabase = get_supabase_client()
+    
+    try:
+        # Fetch all items from aviation_inventory table
+        response = supabase.table("aviation_inventory").select("*").execute()
+        
+        # Separate paints and carpets
+        paints = []
+        carpets = []
+        
+        if response.data:
+            for row in response.data:
+                description = row.get("description", "").upper()
+                category = row.get("category", "").lower() if row.get("category") else ""
+                
+                # Determine if it's carpet or paint
+                is_carpet = category == "carpet" or "CARPET" in description or "AERMAT" in description
+                
+                # Get color_type for display
+                color_type = None
+                if "BLUE" in description or "8451" in description:
+                    color_type = "BLUE"
+                elif "GREY" in description or "992" in description:
+                    color_type = "GREY"
+                elif "WOVEN" in description:
+                    color_type = "WOVEN"
+                elif "ECONYL" in description or "RIPS" in description:
+                    color_type = "ECONYL RIPS"
+                
+                item = {
+                    "part_number": row.get("part_number", ""),
+                    "description": row.get("description", ""),
+                    "current_stock": float(row.get("current_stock", 0)) if row.get("current_stock") else 0,
+                    "uom": row.get("uom", "KG"),
+                    "category": row.get("category", ""),
+                    "is_available": (row.get("current_stock", 0) or 0) > 0,
+                    "color_type": color_type
+                }
+                
+                if is_carpet:
+                    carpets.append(item)
+                else:
+                    paints.append(item)
+        
+        return templates.TemplateResponse("stock.html", {
+            "request": request,
+            "greeting": get_greeting(),
+            "paints": paints,
+            "carpets": carpets
+        })
+    except Exception as e:
+        return templates.TemplateResponse("stock.html", {
+            "request": request,
+            "greeting": get_greeting(),
+            "paints": [],
+            "carpets": []
+        })
+
+
+@app.post("/add-item")
+async def add_item(request: Request):
+    """
+    Add new item to aviation_inventory table via form submission.
+    Redirects back to /stock after insertion.
+    """
+    from fastapi.responses import RedirectResponse
+    
+    # Get form data
+    form_data = await request.form()
+    part_number = form_data.get("part_number", "").strip()
+    description = form_data.get("description", "").strip()
+    category = form_data.get("category", "").strip()
+    
+    if not part_number or not description:
+        # Redirect back to stock with error (could add error handling)
+        return RedirectResponse(url="/stock", status_code=303)
+    
+    try:
+        supabase = get_supabase_client()
+        
+        # Insert into aviation_inventory table
+        new_item = {
+            "part_number": part_number,
+            "description": description,
+            "category": category,
+            "current_stock": 0,
+            "opening_stock": 0,
+            "uom": "KG"  # Default UOM
+        }
+        
+        supabase.table("aviation_inventory").insert(new_item).execute()
+        
+    except Exception as e:
+        print(f"Error adding item: {e}")
+    
+    return RedirectResponse(url="/stock", status_code=303)
+
+
+@app.get("/sales")
+async def sales_page(request: Request):
+    """Sales page."""
+    return templates.TemplateResponse("sales.html", {
+        "request": request,
+        "greeting": get_greeting()
+    })
+
+
+@app.get("/purchase-orders")
+async def purchase_orders_page(request: Request):
+    """Purchase Orders page."""
+    now = datetime.now()
+    current_date = now.strftime("%Y-%m-%d")
+    po_number = f"PO-{now.strftime('%y')}-{now.strftime('%m%d')}-{now.strftime('%H%M%S')}"
+    
+    return templates.TemplateResponse("purchase_order.html", {
+        "request": request,
+        "greeting": get_greeting(),
+        "current_date": current_date,
+        "po_number": po_number
+    })
+
+
+@app.get("/completed-orders")
+async def completed_orders_page(request: Request):
+    """Completed Orders page."""
+    return templates.TemplateResponse("completed_orders.html", {
+        "request": request,
+        "greeting": get_greeting()
+    })
+
+
+@app.get("/reports")
+async def reports_page(request: Request):
+    """Reports page."""
+    return templates.TemplateResponse("reports.html", {
+        "request": request,
+        "greeting": get_greeting()
+    })
+
+
+@app.get("/quote")
+async def quote_page(request: Request):
+    """Quote Generator page."""
+    now = datetime.now()
+    current_date = now.strftime("%d/%m/%Y")
+    quote_number = f"QTE-{now.strftime('%Y%m%d')}-{now.strftime('%H%M%S')}"
+    
+    return templates.TemplateResponse("quote.html", {
+        "request": request,
+        "greeting": get_greeting(),
+        "current_date": current_date,
+        "quote_number": quote_number
+    })
 
 
 # =============================================================================

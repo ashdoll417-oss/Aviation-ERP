@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Aviation ERP{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8 animate-fade-in">
+    <h1 class="text-2xl font-semibold text-primary flex items-center gap-3">
+        <i class="bi bi-graph-up"></i> Reports
+    </h1>
+    <nav class="mt-2 text-sm text-gray-500">
+        <a href="/" class="hover:text-secondary">Dashboard</a> / <span class="text-secondary">Reports</span>
+    </nav>
+</div>
+
+<!-- Report Type Selection -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow duration-300 cursor-pointer animate-fade-in" onclick="selectReport('sales')" style="animation-delay: 0.1s;">
+        <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center text-secondary text-xl mb-4">
+            <i class="bi bi-cart3"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-primary">Sales Report</h3>
+        <p class="text-gray-500 text-sm mt-1">View sales transactions and revenue</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow duration-300 cursor-pointer animate-fade-in" onclick="selectReport('inventory')" style="animation-delay: 0.2s;">
+        <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 text-xl mb-4">
+            <i class="bi bi-box-seam"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-primary">Inventory Report</h3>
+        <p class="text-gray-500 text-sm mt-1">Stock levels and movements</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow duration-300 cursor-pointer animate-fade-in" onclick="selectReport('purchases')" style="animation-delay: 0.3s;">
+        <div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center text-orange-500 text-xl mb-4">
+            <i class="bi bi-basket"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-primary">Purchase Report</h3>
+        <p class="text-gray-500 text-sm mt-1">Purchase orders and suppliers</p>
+    </div>
+    
+    <div class="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow duration-300 cursor-pointer animate-fade-in" onclick="selectReport('lowstock')" style="animation-delay: 0.4s;">
+        <div class="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center text-red-500 text-xl mb-4">
+            <i class="bi bi-exclamation-triangle"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-primary">Low Stock Alert</h3>
+        <p class="text-gray-500 text-sm mt-1">Items below reorder level</p>
+    </div>
+</div>
+
+<!-- Date Range Filter -->
+<div class="bg-white rounded-xl shadow-lg p-6 mb-8 animate-fade-in">
+    <h3 class="text-lg font-semibold text-primary mb-4">Filter Options</h3>
+    <div class="flex flex-wrap gap-4 items-end">
+        <div class="w-40">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Date From</label>
+            <input type="date" id="dateFrom" 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent">
+        </div>
+        <div class="w-40">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Date To</label>
+            <input type="date" id="dateTo" 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent">
+        </div>
+        <div class="w-40">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
+            <select id="reportType" 
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+            </select>
+        </div>
+        <div>
+            <button onclick="generateReport()" 
+                    class="px-6 py-2 bg-secondary hover:bg-blue-600 text-white rounded-lg font-medium transition-colors">
+                <i class="bi bi-file-earmark-text"></i> Generate Report
+            </button>
+        </div>
+        <div>
+            <button onclick="exportReport()" 
+                    class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors">
+                <i class="bi bi-download"></i> Export CSV
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Report Results -->
+<div class="bg-white rounded-xl shadow-lg overflow-hidden animate-fade-in" id="reportResults">
+    <div class="px-6 py-4 border-b bg-gray-50">
+        <h3 class="text-lg font-semibold text-primary" id="reportTitle">Sales Report</h3>
+        <p class="text-sm text-gray-500" id="reportDateRange">Period: All Time</p>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr id="reportTableHeader">
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                    <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
+                    <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200" id="reportTableBody">
+                <tr>
+                    <td colspan="4" class="px-6 py-12 text-center text-gray-500">
+                        <i class="bi bi-file-earmark-text text-5xl mb-4"></i>
+                        <p>Select a report type and click Generate Report</p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Summary Cards -->
+    <div class="px-6 py-4 bg-gray-50 border-t" id="summarySection">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white rounded-lg p-4 border">
+                <p class="text-sm text-gray-500">Total Records</p>
+                <p class="text-2xl font-bold text-primary" id="totalRecords">0</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 border">
+                <p class="text-sm text-gray-500">Total Amount</p>
+                <p class="text-2xl font-bold text-green-600" id="totalAmount">KES 0.00</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 border">
+                <p class="text-sm text-gray-500">Average</p>
+                <p class="text-2xl font-bold text-secondary" id="averageAmount">KES 0.00</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-fade-in {
+        animation: fadeIn 0.5s ease forwards;
+        opacity: 0;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{% raw %}
+<script>
+let currentReportType = 'sales';
+
+// Sample data
+const sampleData = {
+    sales: [
+        { date: '2024-01-15', description: 'Paint Kit Sale - Kenya Airways', amount: 45000, status: 'Completed' },
+        { date: '2024-01-14', description: 'Carpet Sale - Safaricom', amount: 28500, status: 'Completed' },
+        { date: '2024-01-13', description: 'Chemicals - Kenya Power', amount: 72000, status: 'Completed' },
+        { date: '2024-01-12', description: 'Topcoat Sale - East Africa Air', amount: 35000, status: 'Completed' },
+        { date: '2024-01-11', description: 'Primer Sale - Wilson Airport', amount: 18000, status: 'Completed' }
+    ],
+    inventory: [
+        { date: '2024-01-15', description: 'EPOXY PRIMER 6KG', amount: 50, status: 'In Stock' },
+        { date: '2024-01-14', description: 'WHITE TOPCOAT 10KG', amount: 30, status: 'Low Stock' },
+        { date: '2024-01-13', description: 'TOPCOAT HARDENER 5L', amount: 25, status: 'In Stock' },
+        { date: '2024-01-12', description: 'AERMAT 9000/992 GREY', amount: 0, status: 'Out of Stock' },
+        { date: '2024-01-11', description: 'CARPET WOVEN', amount: 100, status: 'In Stock' }
+    ],
+    purchases: [
+        { date: '2024-01-15', description: 'PO-001 - AkzoNobel', amount: 150000, status: 'Approved' },
+        { date: '2024-01-14', description: 'PO-002 - PPG Industries', amount: 85000, status: 'Pending' },
+        { date: '2024-01-13', description: 'PO-003 - Henkel', amount: 45000, status: 'Approved' },
+        { date: '2024-01-12', description: 'PO-004 - 3M', amount: 72000, status: 'Received' },
+        { date: '2024-01-11', description: 'PO-005 - BASF', amount: 95000, status: 'Approved' }
+    ],
+    lowstock: [
+        { date: '2024-01-15', description: 'WHITE TOPCOAT 10KG', amount: 30, status: 'Low Stock' },
+        { date: '2024-01-14', description: 'AERMAT 9000/992 GREY', amount: 0, status: 'Out of Stock' },
+        { date: '2024-01-13', description: 'TOPCOAT THINNER 5L', amount: 15, status: 'Low Stock' }
+    ]
+};
+
+function selectReport(type) {
+    currentReportType = type;
+    const titles = {
+        sales: 'Sales Report',
+        inventory: 'Inventory Report',
+        purchases: 'Purchase Report',
+        lowstock: 'Low Stock Alert'
+    };
+    document.getElementById('reportTitle').textContent = titles[type];
+    generateReport();
+}
+
+function generateReport() {
+    const data = sampleData[currentReportType] || [];
+    const tbody = document.getElementById('reportTableBody');
+    
+    // Set headers based on report type
+    const headers = {
+        sales: ['Date', 'Description', 'Amount', 'Status'],
+        inventory: ['Date', 'Item', 'Stock Level', 'Status'],
+        purchases: ['Date', 'PO Number / Supplier', 'Amount', 'Status'],
+        lowstock: ['Date', 'Item', 'Current Stock', 'Alert']
+    };
+    
+    const headerRow = headers[currentReportType];
+    document.getElementById('reportTableHeader').innerHTML = headerRow.map(h => 
+        `<th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">${h}</th>`
+    ).join('');
+    
+    if (data.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="${headerRow.length}" class="px-6 py-12 text-center text-gray-500">
+                    <i class="bi bi-file-earmark-text text-5xl mb-4"></i>
+                    <p>No data available</p>
+                </td>
+            </tr>
+        `;
+    } else {
+        tbody.innerHTML = data.map(item => `
+            <tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-6 py-4 whitespace-nowrap text-gray-600">${item.date}</td>
+                <td class="px-6 py-4 text-gray-900 font-medium">${item.description}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right font-semibold text-gray-900">
+                    ${typeof item.amount === 'number' && currentReportType !== 'inventory' && currentReportType !== 'lowstock' 
+                        ? 'KES ' + item.amount.toLocaleString('en-KE', {minimumFractionDigits: 2}) 
+                        : item.amount}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    ${getStatusBadge(item.status)}
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    // Update summary
+    const totalRecords = data.length;
+    const totalAmount = data.reduce((sum, item) => typeof item.amount === 'number' ? sum + item.amount : sum, 0);
+    const averageAmount = totalRecords > 0 ? totalAmount / totalRecords : 0;
+    
+    document.getElementById('totalRecords').textContent = totalRecords;
+    document.getElementById('totalAmount').textContent = 'KES ' + totalAmount.toLocaleString('en-KE', {minimumFractionDigits: 2});
+    document.getElementById('averageAmount').textContent = 'KES ' + averageAmount.toLocaleString('en-KE', {minimumFractionDigits: 2});
+    
+    // Update date range
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    let dateRange = 'All Time';
+    if (dateFrom && dateTo) {
+        dateRange = `${dateFrom} to ${dateTo}`;
+    } else if (dateFrom) {
+        dateRange = `From ${dateFrom}`;
+    } else if (dateTo) {
+        dateRange = `Until ${dateTo}`;
+    }
+    document.getElementById('reportDateRange').textContent = `Period: ${dateRange}`;
+}
+
+function getStatusBadge(status) {
+    const statusClasses = {
+        'Completed': 'bg-green-100 text-green-800',
+        'In Stock': 'bg-green-100 text-green-800',
+        'Approved': 'bg-green-100 text-green-800',
+        'Received': 'bg-blue-100 text-blue-800',
+        'Low Stock': 'bg-yellow-100 text-yellow-800',
+        'Out of Stock': 'bg-red-100 text-red-800',
+        'Pending': 'bg-orange-100 text-orange-800'
+    };
+    
+    const cls = statusClasses[status] || 'bg-gray-100 text-gray-800';
+    return `<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${cls}">${status}</span>`;
+}
+
+function exportReport() {
+    const data = sampleData[currentReportType] || [];
+    if (data.length === 0) {
+        alert('No data to export');
+        return;
+    }
+    
+    // Simple CSV export
+    let csv = 'Date,Description,Amount,Status\n';
+    data.forEach(item => {
+        csv += `${item.date},"${item.description}",${item.amount},${item.status}\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentReportType}_report_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+}
+</script>
+{% endraw %}
+{% endblock %}
+
