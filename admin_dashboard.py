@@ -95,6 +95,13 @@ class SavePORequest(BaseModel):
     status: str = "PENDING"
 
 
+class UpdatePOStatusRequest(BaseModel):
+    """Request model for updating PO status."""
+    po_id: str
+    status: str  # 'APPROVED' or 'REJECTED'
+    notes: Optional[str] = None
+
+
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
@@ -354,6 +361,110 @@ async def reports(request: Request):
             "page_icon": "graph-up"
         }
     )
+
+
+# =============================================================================
+# ADMIN APPROVALS ROUTES
+# =============================================================================
+
+@app.get("/admin/approvals")
+async def admin_approvals(request: Request):
+    """Admin Approvals page - shows pending POs for approval."""
+    greeting = get_time_greeting()
+    return templates.TemplateResponse(
+        "admin_approvals.html",
+        {
+            "request": request,
+            "greeting": greeting,
+            "page_title": "Admin Approvals",
+            "page_icon": "bi-check2-square"
+        }
+    )
+
+
+@app.get("/api/admin/pending-pos")
+async def get_pending_pos():
+    """Get all pending purchase orders from Supabase."""
+    supabase = get_supabase_client()
+    
+    try:
+        # Fetch pending POs
+        pos_response = supabase.table("purchase_orders").select(
+            "id, po_number, supplier, po_date, total_usd, status, created_at"
+        ).eq("status", "PENDING").order("created_at", desc=True).execute()
+        
+        return {
+            "success": True,
+            "purchase_orders": pos_response.data
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "purchase_orders": []
+        }
+
+
+@app.get("/api/admin/po/{po_id}")
+async def get_po_details(po_id: str):
+    """Get full PO details including items."""
+    supabase = get_supabase_client()
+    
+    try:
+        # Get PO header
+        po_response = supabase.table("purchase_orders").select("*").eq("id", po_id).execute()
+        
+        if not po_response.data:
+            return {"success": False, "error": "PO not found"}
+        
+        # Get PO items
+        items_response = supabase.table("purchase_order_items").select("*").eq("po_id", po_id).execute()
+        
+        return {
+            "success": True,
+            "po": po_response.data[0],
+            "items": items_response.data
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.post("/api/admin/po/update-status")
+async def update_po_status(request: UpdatePOStatusRequest):
+    """Update PO status (APPROVED or REJECTED)."""
+    supabase = get_supabase_service_client()
+    
+    try:
+        # Update PO status
+        update_response = supabase.table("purchase_orders").update({
+            "status": request.status,
+            "notes": request.notes,
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", request.po_id).execute()
+        
+        if not update_response.data:
+            raise Exception("Failed to update PO status")
+        
+        # Get updated PO
+        po_response = supabase.table("purchase_orders").select("*").eq("id", request.po_id).execute()
+        po = po_response.data[0] if po_response.data else None
+        
+        message = ""
+        if request.status == "APPROVED":
+            message = f"PO {po['po_number']} has been approved. The PO has been sent to the supplier and a PDF will be generated for email."
+        else:
+            message = f"PO {po['po_number']} has been rejected."
+        
+        return {
+            "success": True,
+            "message": message,
+            "po": po
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating PO status: {str(e)}")
 
 
 @app.get("/stock")
