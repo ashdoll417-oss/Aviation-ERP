@@ -6,8 +6,10 @@ Home Route: Returns time-based greeting
 Inventory Route: Fetches items from aviation_inventory table with special handling
 """
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any
 from datetime import datetime
@@ -37,6 +39,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =============================================================================
+# TEMPLATES AND STATIC FILES
+# =============================================================================
+
+# Initialize Jinja2 templates
+templates = Jinja2Templates(directory="templates")
+
+# Mount static files (optional - CSS is loaded via CDN in templates)
+# Create a static directory if needed
+import os
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 # =============================================================================
@@ -260,10 +276,10 @@ def build_inventory_items(rows: list) -> List[InventoryItem]:
 # API ENDPOINTS
 # =============================================================================
 
-@app.get("/", response_model=dict)
-async def root():
+@app.get("/")
+async def root(request: Request):
     """
-    Root endpoint - returns time-based greeting.
+    Root endpoint - returns HTML dashboard with time-based greeting.
     
     Time-based greeting:
     - 05:00-11:59: 'Good Morning, AISL Aviation Team'
@@ -283,12 +299,10 @@ async def root():
     else:
         greeting = "Good Evening"
     
-    return {
-        "message": greeting,
-        "status": "running",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "greeting": greeting
+    })
 
 
 @app.get("/inventory", response_model=InventoryResponse)
