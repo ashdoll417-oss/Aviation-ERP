@@ -1,0 +1,1 @@
+{"detail":"Error fetching inventory: {'message': \"Could not find the table 'public.aviation_inventory' in the schema cache\", 'code': 'PGRST205', 'hint': None, 'details': None}"}

@@ -1,0 +1,3 @@
+# Separate requirements for API deployment (if needed)
+# This file is not needed if using the main requirements.txt
+
