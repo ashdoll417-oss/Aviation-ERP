@@ -76,6 +76,25 @@ class SaveQuoteRequest(BaseModel):
     grand_total: float
 
 
+class POItemRequest(BaseModel):
+    """Request model for purchase order item."""
+    part_number: str
+    description: str
+    quantity: float
+    uom: str
+    unit_price_usd: float
+
+
+class SavePORequest(BaseModel):
+    """Request model for saving a purchase order."""
+    po_number: str
+    supplier: str
+    po_date: str
+    items: List[POItemRequest]
+    total_usd: float
+    status: str = "PENDING"
+
+
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
@@ -230,17 +249,81 @@ async def sales(request: Request):
 
 @app.get("/purchase-orders")
 async def purchase_orders(request: Request):
-    """Purchase Orders page."""
+    """Purchase Orders page for Aero Instrument Service Ltd."""
     greeting = get_time_greeting()
+    
+    # Generate PO number
+    now = datetime.now()
+    po_number = f"PO-{now.strftime('%y')}-{now.strftime('%m')}{now.strftime('%d')}-{now.strftime('%H%M%S')}"
+    
+    # Get current date
+    current_date = now.strftime('%Y-%m-%d')
+    
     return templates.TemplateResponse(
-        "page.html",
+        "purchase_order.html",
         {
             "request": request,
             "greeting": greeting,
             "page_title": "Purchase Orders",
-            "page_icon": "basket"
+            "page_icon": "basket",
+            "po_number": po_number,
+            "current_date": current_date
         }
     )
+
+
+@app.post("/api/purchase-order/save")
+async def save_purchase_order(request: SavePORequest):
+    """
+    Save purchase order to purchase_orders table in Supabase.
+    
+    Args:
+        request: SavePORequest with PO details and items
+    
+    Returns:
+        Success message with PO ID
+    """
+    supabase = get_supabase_service_client()
+    
+    try:
+        # Create PO record
+        po_data = {
+            "po_number": request.po_number,
+            "supplier": request.supplier,
+            "po_date": request.po_date,
+            "total_usd": request.total_usd,
+            "status": "PENDING",
+            "created_at": datetime.now().isoformat()
+        }
+        
+        po_response = supabase.table("purchase_orders").insert(po_data).execute()
+        
+        if not po_response.data:
+            raise Exception("Failed to create purchase order")
+        
+        po_id = po_response.data[0].get("id")
+        
+        # Insert PO items
+        for item in request.items:
+            item_data = {
+                "po_id": po_id,
+                "part_number": item.part_number,
+                "description": item.description,
+                "quantity": item.quantity,
+                "uom": item.uom,
+                "unit_price_usd": item.unit_price_usd,
+                "total_usd": item.quantity * item.unit_price_usd
+            }
+            supabase.table("purchase_order_items").insert(item_data).execute()
+        
+        return {
+            "success": True,
+            "message": f"PO {request.po_number} has been submitted for approval. You will be notified once the Admin signs off.",
+            "po_id": po_id,
+            "po_number": request.po_number
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving purchase order: {str(e)}")
 
 
 @app.get("/completed-orders")
