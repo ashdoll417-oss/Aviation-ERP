@@ -199,6 +199,7 @@ class CarpetItem(BaseModel):
     id: Optional[str] = Field(default=None, description="Product UUID")
     sku: str = Field(..., description="Product SKU")
     name: str = Field(..., description="Product name")
+    highlighted_name: Optional[str] = Field(default=None, description="Product name with explicit color/material highlight for AERMAT 9000 and CARPET items")
     category: str = Field(..., description="Carpet category")
     quantity: int = Field(..., description="Current stock quantity")
     quantity_display: str = Field(..., description="Display string for quantity (e.g., '0' or 'Out of Stock')")
@@ -273,6 +274,69 @@ class ConfirmSaleResponse(BaseModel):
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
+def format_highlighted_name(product_name: str, color: str, material_type: str) -> Optional[str]:
+    """
+    Format product name with explicit color/material highlight for AERMAT 9000 and CARPET items.
+    
+    This function ensures staff can easily distinguish between:
+    - AERMAT 9000 colors: GREY (992) vs BLUE (8451)
+    - CARPET types: WOVEN vs ECONYL RIPS
+    
+    Args:
+        product_name: Original product name
+        color: Product color (e.g., 'GREY', 'BLUE')
+        material_type: Product material type (e.g., 'WOVEN', 'ECONYL')
+    
+    Returns:
+        Highlighted name string with explicit color/material type, or None if no highlight needed
+    """
+    if not product_name:
+        return None
+    
+    product_name_upper = product_name.upper()
+    color_upper = color.upper() if color else ""
+    material_upper = material_type.upper() if material_type else ""
+    
+    # Check for AERMAT 9000 products - highlight color explicitly
+    is_aermat = "AERMAT" in product_name_upper or material_upper == "AERMAT"
+    
+    if is_aermat:
+        # Determine color for AERMAT 9000
+        if "GREY" in color_upper or "992" in product_name_upper:
+            # Return highlighted name with explicit GREY color
+            return f"{product_name} [COLOR: GREY]"
+        elif "BLUE" in color_upper or "8451" in product_name_upper:
+            # Return highlighted name with explicit BLUE color
+            return f"{product_name} [COLOR: BLUE]"
+        else:
+            # Color not specified, try to infer from name
+            if "GREY" in product_name_upper:
+                return f"{product_name} [COLOR: GREY]"
+            elif "BLUE" in product_name_upper:
+                return f"{product_name} [COLOR: BLUE]"
+    
+    # Check for CARPET products - highlight material type explicitly
+    is_carpet = "CARPET" in product_name_upper or material_upper in ["WOVEN", "ECONYL"]
+    
+    if is_carpet:
+        # Determine material type for CARPET
+        if material_upper == "WOVEN" or "WOVEN" in product_name_upper:
+            # Return highlighted name with explicit WOVEN material
+            return f"{product_name} [MATERIAL: WOVEN]"
+        elif material_upper == "ECONYL" or "ECONYL" in product_name_upper or "RIPS" in product_name_upper:
+            # Return highlighted name with explicit ECONYL RIPS material
+            return f"{product_name} [MATERIAL: ECONYL RIPS]"
+        else:
+            # Try to infer from name
+            if "WOVEN" in product_name_upper:
+                return f"{product_name} [MATERIAL: WOVEN]"
+            elif "ECONYL" in product_name_upper or "RIPS" in product_name_upper:
+                return f"{product_name} [MATERIAL: ECONYL RIPS]"
+    
+    # No highlight needed for non-AERMAT/CARPET products
+    return None
+
 
 def get_unit_symbol(supabase, unit_id: str) -> str:
     """Get unit symbol from unit ID."""
@@ -520,11 +584,15 @@ async def get_inventory(category: Optional[str] = None):
             if color and color not in product_name.upper():
                 display_name = f"{product_name} ({color})"
             
+            # Generate highlighted name for AERMAT 9000 and CARPET items
+            highlighted_name = format_highlighted_name(product_name, color, material_type)
+            
             # Create carpet item
             carpet_item = CarpetItem(
                 id=product.get("id"),
                 sku=product.get("sku", "N/A"),
                 name=display_name,
+                highlighted_name=highlighted_name,
                 category="",  # Will be set based on subcategory
                 quantity=quantity,
                 quantity_display=quantity_display,
