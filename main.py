@@ -1289,6 +1289,15 @@ async def suppliers_page(request: Request):
         })
 
 
+@app.get("/supplier")
+async def supplier_page_redirect(request: Request):
+    """
+    Redirect /supplier to /suppliers (alias for convenience)
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/suppliers", status_code=301)
+
+
 @app.post("/add-supplier")
 async def add_supplier(request: Request):
     """
