@@ -285,17 +285,14 @@ def get_low_stock_items() -> List[dict]:
     supabase = get_supabase_client()
     
     try:
-        # Total Safety: Explicitly select columns EXCLUDING min_threshold to avoid error 42703
-        response = supabase.table("aviation_inventory").select(
-            "id, part_number, description, current_stock, barcode_id, uom"
-        ).execute()
+        # Universal Fail-Safe: Use .select('*') to get all columns
+        response = supabase.table("aviation_inventory").select("*").execute()
         
         low_stock_items = []
         if response.data:
             for row in response.data:
+                # Python Dictionary Fix: Use .get() with defaults for every column
                 current_stock = float(row.get("current_stock", 0)) if row.get("current_stock") else 0
-                # Python Filtering: Manually add min_threshold with default 5
-                row['min_threshold'] = row.get('min_threshold', 5)
                 min_threshold = float(row.get('min_threshold', 5))
                 
                 # Check if current_stock <= min_threshold
@@ -382,10 +379,10 @@ async def root(request: Request):
     """
     Root endpoint - returns HTML dashboard with time-based greeting.
     
-    Time-based greeting (Nairobi timezone):
-    - 05:00-11:59: 'Good Morning, AISL Aviation Team'
-    - 12:00-17:59: 'Good Afternoon'
-    - Otherwise (18:00-04:59): 'Good Evening'
+    Universal Fail-Safe:
+    - Uses .select('*') to get all columns
+    - Uses .get() with defaults for every column
+    - Never crashes even if table is empty or missing columns
     """
     # Use Nairobi timezone for accurate greeting
     nairobi_tz = pytz.timezone('Africa/Nairobi')
@@ -401,22 +398,15 @@ async def root(request: Request):
     else:
         greeting = "Good Evening"
     
-    # Total Safety: Wrap stock fetching in try/except to prevent page crashes
-    # Explicit columns EXCLUDING min_threshold to avoid error 42703
+    # Universal Fail-Safe: Use .select('*') and .get() with defaults
     try:
         supabase = get_supabase_client()
         
-        # Fetch items with EXPLICIT columns - EXCLUDING min_threshold
-        response = supabase.table("aviation_inventory").select(
-            "id, part_number, description, current_stock"
-        ).execute()
+        # Use .select('*') to get all columns
+        response = supabase.table("aviation_inventory").select("*").execute()
         
-        # Python Filtering: Manually add min_threshold with default 5
+        # Use .get() with defaults for every column that might be missing
         items = response.data or []
-        for item in items:
-            item['min_threshold'] = item.get('min_threshold', 5)
-        
-        # Filter in Python using the manually added min_threshold
         low_stock_items = [
             item for item in items
             if float(item.get('current_stock', 0)) <= float(item.get('min_threshold', 5))
@@ -424,6 +414,7 @@ async def root(request: Request):
         low_stock_count = len(low_stock_items)
     except Exception as e:
         print(f"Error fetching low stock items: {e}")
+        # Return empty list on error - fail-safe
         low_stock_items = []
         low_stock_count = 0
     
@@ -551,33 +542,30 @@ async def get_low_stock_count():
     - Default to 0 if error
     - Fetch only current_stock and do manual calculation
     - Never returns 500 error
+    - Returns {'count': 0} on failure (not the error dictionary)
     """
     try:
         supabase = get_supabase_client()
         
-        # Fetch ONLY current_stock column - avoid min_threshold column error
-        response = supabase.table("aviation_inventory").select("current_stock").execute()
+        # Use .select('*') for universal fail-safe
+        response = supabase.table("aviation_inventory").select("*").execute()
         
         # Manual calculation: count items where current_stock <= 5
         low_stock_count = 0
         if response.data:
             for row in response.data:
+                # Python Dictionary Fix: Use .get() with defaults
                 current_stock = float(row.get("current_stock", 0)) if row.get("current_stock") else 0
-                # Hardcoded threshold of 5 if min_threshold fails
-                if current_stock <= 5:
+                min_threshold = float(row.get('min_threshold', 5))
+                # Check if current_stock <= min_threshold
+                if current_stock <= min_threshold:
                     low_stock_count += 1
         
-        return {
-            "success": True,
-            "count": low_stock_count
-        }
+        return {"count": low_stock_count}
     except Exception as e:
-        # Default to 0 on any error - never return 500
+        # Default to 0 on any error - return simple {'count': 0} as requested
         print(f"Error in /api/low-stock/count: {e}")
-        return {
-            "success": True,
-            "count": 0
-        }
+        return {"count": 0}
 
 
 @app.get("/api/low-stock/details")
@@ -614,14 +602,16 @@ async def stock_page(request: Request):
     """
     Stock Management page - renders stock.html with inventory data.
     Includes Manual Entry Form at the top.
+    
+    Universal Fail-Safe:
+    - Uses .select('*') to get all columns
+    - Uses .get() with defaults for every column
     """
     supabase = get_supabase_client()
     
     try:
-        # Explicitly select columns to avoid error 42703 (undefined column)
-        response = supabase.table("aviation_inventory").select(
-            "id, part_number, description, current_stock, uom, category, batch_no, expiry_date, min_threshold"
-        ).execute()
+        # Universal Fail-Safe: Use .select('*') to get all columns
+        response = supabase.table("aviation_inventory").select("*").execute()
         
         # Separate paints and carpets
         paints = []
@@ -629,6 +619,7 @@ async def stock_page(request: Request):
         
         if response.data:
             for row in response.data:
+                # Python Dictionary Fix: Use .get() with defaults for every column
                 description = row.get("description", "").upper()
                 category = row.get("category", "").lower() if row.get("category") else ""
                 
@@ -660,6 +651,7 @@ async def stock_page(request: Request):
                     except:
                         expiry_display = str(expiry_date)
                 
+                # Python Dictionary Fix: Use .get() with defaults
                 item = {
                     "part_number": row.get("part_number", ""),
                     "description": row.get("description", ""),
@@ -685,6 +677,7 @@ async def stock_page(request: Request):
             "carpets": carpets
         })
     except Exception as e:
+        # Return empty lists on error - fail-safe
         return templates.TemplateResponse("stock.html", {
             "request": request,
             "greeting": get_greeting(),
