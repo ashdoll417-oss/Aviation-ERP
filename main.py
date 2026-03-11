@@ -1090,6 +1090,73 @@ async def delete_supplier(supplier_id: str):
 
 
 # =============================================================================
+# STOCK LOGS ROUTES
+# =============================================================================
+
+@app.get("/admin/logs")
+async def stock_logs_page(request: Request):
+    """
+    Stock Logs page - displays all stock transaction logs.
+    Supports search by staff name or part number.
+    """
+    from urllib.parse import urlencode
+    
+    # Get search query from URL
+    search_query = request.query_params.get("search", "").strip()
+    
+    supabase = get_supabase_client()
+    
+    try:
+        # Fetch all stock logs ordered by date descending
+        if search_query:
+            # Search by part_number or notes (which contains staff name)
+            response = supabase.table("stock_logs").select("*").or_(
+                f"part_number.ilike.%{search_query}%,notes.ilike.%{search_query}%"
+            ).order("created_at", desc=True).execute()
+        else:
+            response = supabase.table("stock_logs").select("*").order("created_at", desc=True).execute()
+        
+        logs = []
+        if response.data:
+            for row in response.data:
+                # Format the created_at timestamp
+                created_at = row.get("created_at")
+                if created_at:
+                    try:
+                        dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        formatted_date = dt.strftime("%d/%m/%Y %H:%M")
+                    except:
+                        formatted_date = str(created_at)
+                else:
+                    formatted_date = "-"
+                
+                log_entry = {
+                    "created_at": formatted_date,
+                    "part_number": row.get("part_number", ""),
+                    "transaction_type": row.get("transaction_type", ""),
+                    "quantity": float(row.get("quantity", 0)) if row.get("quantity") else 0,
+                    "previous_stock": float(row.get("previous_stock", 0)) if row.get("previous_stock") else 0,
+                    "new_stock": float(row.get("new_stock", 0)) if row.get("new_stock") else 0,
+                    "notes": row.get("notes", "")
+                }
+                logs.append(log_entry)
+        
+        return templates.TemplateResponse("stock_logs.html", {
+            "request": request,
+            "greeting": get_greeting(),
+            "logs": logs,
+            "search_query": search_query
+        })
+    except Exception as e:
+        return templates.TemplateResponse("stock_logs.html", {
+            "request": request,
+            "greeting": get_greeting(),
+            "logs": [],
+            "search_query": search_query
+        })
+
+
+# =============================================================================
 # MAIN ENTRY POINT
 # =============================================================================
 

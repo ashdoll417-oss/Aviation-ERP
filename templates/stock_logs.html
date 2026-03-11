@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Logs - Aviation ERP{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8 animate-fade-in">
+    <h1 class="text-2xl font-semibold text-primary flex items-center gap-3">
+        <i class="bi bi-journal-text"></i> Stock Logs
+    </h1>
+    <nav class="mt-2 text-sm text-gray-500">
+        <a href="/" class="hover:text-secondary">Dashboard</a> / <span class="text-secondary">Stock Logs</span>
+    </nav>
+</div>
+
+<!-- Search Filter -->
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6 animate-fade-in">
+    <form method="GET" action="/admin/logs" class="flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <input type="text" 
+                   name="search" 
+                   value="{{ search_query }}"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent"
+                   placeholder="Search by Staff Name or Part Number...">
+        </div>
+        <div>
+            <button type="submit" 
+                    class="px-6 py-2 bg-secondary hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+                <i class="bi bi-search"></i> Search
+            </button>
+        </div>
+        {% if search_query %}
+        <div>
+            <a href="/admin/logs" 
+                    class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors flex items-center gap-2">
+                <i class="bi bi-x-lg"></i> Clear
+            </a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Stock Logs Table -->
+<div class="bg-white rounded-xl shadow-lg overflow-hidden animate-fade-in">
+    <div class="bg-gradient-to-r from-blue-500 to-teal-500 px-6 py-4">
+        <h3 class="text-white text-lg font-semibold flex items-center gap-2">
+            <i class="bi bi-list-check"></i> Transaction History
+        </h3>
+        <p class="text-white/80 text-sm">All stock issue transactions</p>
+    </div>
+    
+    {% if logs %}
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date/Time</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Staff Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Part Number</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Previous Stock</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">New Stock</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for log in logs %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-600">
+                        {{ log.created_at }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                        {% if log.notes %}
+                            {% set staff_name = log.notes.replace('Issued by: ', '') %}
+                            {{ staff_name }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                        {{ log.part_number }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if log.transaction_type == 'ISSUE' %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <i class="bi bi-box-arrow-up mr-1"></i> Issued
+                        </span>
+                        {% elif log.transaction_type == 'RECEIVE' %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <i class="bi bi-box-arrow-down mr-1"></i> Received
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            {{ log.transaction_type }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap font-semibold text-gray-900">
+                        {{ log.quantity }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-600">
+                        {{ log.previous_stock }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap font-semibold text-gray-900">
+                        {{ log.new_stock }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="p-12 text-center text-gray-500">
+        <i class="bi bi-inbox text-5xl mb-4"></i>
+        <p>No stock logs found.</p>
+        {% if search_query %}
+        <p class="text-sm mt-2">Try adjusting your search criteria.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-fade-in {
+        animation: fadeIn 0.5s ease forwards;
+    }
+</style>
+{% endblock %}
+
