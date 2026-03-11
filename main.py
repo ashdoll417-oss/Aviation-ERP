@@ -795,10 +795,10 @@ async def issue_item_page(request: Request):
 @app.get("/staff/issue")
 async def staff_issue_page(request: Request):
     """
-    Staff Issue Stock page - simplified barcode scanner interface for issuing stock.
-    Single input box for scanning barcode, quick deduction from current_stock.
+    Staff Issue Stock page - dedicated simplified interface for staff to issue stock.
+    Located at /staff/issue route with no sidebar, just Logout and Issue buttons.
     """
-    return templates.TemplateResponse("issue_stock.html", {
+    return templates.TemplateResponse("staff_issue.html", {
         "request": request,
         "greeting": get_greeting()
     })
@@ -1037,7 +1037,7 @@ async def issue_product(request: Request):
         supabase = get_supabase_client()
         
         # Get current stock
-        response = supabase.table("aviation_inventory").select("current_stock").eq("part_number", part_number).execute()
+        response = supabase.table("aviation_inventory").select("current_stock, min_threshold").eq("part_number", part_number).execute()
         
         if not response.data or len(response.data) == 0:
             return JSONResponse(
@@ -1046,6 +1046,7 @@ async def issue_product(request: Request):
             )
         
         current_stock = float(response.data[0].get("current_stock", 0)) if response.data[0].get("current_stock") else 0
+        min_threshold = float(response.data[0].get("min_threshold", 10)) if response.data[0].get("min_threshold") else 10
         new_stock = current_stock - quantity
         
         # Ensure stock doesn't go negative
@@ -1070,12 +1071,137 @@ async def issue_product(request: Request):
         except Exception as log_error:
             print(f"Error logging stock transaction: {log_error}")
         
+        # Check if stock is now low
+        is_low_stock = new_stock <= min_threshold
+        
         return {
             "success": True,
             "message": f"Successfully issued {quantity} units",
             "new_stock": new_stock,
             "previous_stock": current_stock,
-            "issued_quantity": quantity
+            "issued_quantity": quantity,
+            "low_stock": is_low_stock
+        }
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "detail": str(e)}
+        )
+
+
+# =============================================================================
+# STAFF ISSUE API ENDPOINT
+# =============================================================================
+
+@app.post("/api/staff/issue")
+async def staff_issue_product(request: Request):
+    """
+    Staff Issue API - Process stock issue with staff name logging.
+    Used by the dedicated Staff Issuing Page at /staff/issue.
+    
+    Request body:
+    {
+        "staff_name": "John Doe",
+        "part_number": "123-456",
+        "quantity": 1
+    }
+    
+    Returns:
+    {
+        "success": true/false,
+        "message": "...",
+        "new_stock": 5,
+        "low_stock": true/false
+    }
+    """
+    from fastapi.responses import JSONResponse
+    
+    try:
+        body = await request.json()
+        staff_name = body.get("staff_name", "").strip()
+        part_number = body.get("part_number", "").strip()
+        quantity = float(body.get("quantity", 0))
+        
+        # Validation
+        if not staff_name:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "detail": "Staff Name is required"}
+            )
+        
+        if not part_number:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "detail": "Part number is required"}
+            )
+        
+        if quantity <= 0:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "detail": "Quantity must be greater than 0"}
+            )
+        
+        supabase = get_supabase_client()
+        
+        # Get current stock and min_threshold
+        response = supabase.table("aviation_inventory").select("current_stock, min_threshold, description").eq("part_number", part_number).execute()
+        
+        if not response.data or len(response.data) == 0:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "detail": "Product not found"}
+            )
+        
+        product = response.data[0]
+        current_stock = float(product.get("current_stock", 0)) if product.get("current_stock") else 0
+        min_threshold = float(product.get("min_threshold", 10)) if product.get("min_threshold") else 10
+        description = product.get("description", "")
+        
+        # Check if enough stock
+        if quantity > current_stock:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "detail": f"Insufficient stock. Available: {current_stock}"}
+            )
+        
+        new_stock = current_stock - quantity
+        
+        # Ensure stock doesn't go negative
+        if new_stock < 0:
+            new_stock = 0
+        
+        # Update the stock in aviation_inventory
+        supabase.table("aviation_inventory").update({
+            "current_stock": new_stock
+        }).eq("part_number", part_number).execute()
+        
+        # Record transaction in stock_logs with Staff Name
+        try:
+            supabase.table("stock_logs").insert({
+                "part_number": part_number,
+                "transaction_type": "ISSUE",
+                "quantity": quantity,
+                "previous_stock": current_stock,
+                "new_stock": new_stock,
+                "notes": f"Issued by: {staff_name}"
+            }).execute()
+        except Exception as log_error:
+            print(f"Error logging stock transaction: {log_error}")
+        
+        # Check if stock is now low (trigger Low Stock flag for Admin)
+        is_low_stock = new_stock <= min_threshold
+        
+        return {
+            "success": True,
+            "message": f"Successfully issued {quantity} units of {part_number}",
+            "part_number": part_number,
+            "description": description,
+            "new_stock": new_stock,
+            "previous_stock": current_stock,
+            "issued_quantity": quantity,
+            "staff_name": staff_name,
+            "low_stock": is_low_stock
         }
         
     except Exception as e:
