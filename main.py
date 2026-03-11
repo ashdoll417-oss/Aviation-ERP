@@ -285,17 +285,18 @@ def get_low_stock_items() -> List[dict]:
     supabase = get_supabase_client()
     
     try:
-        # Explicitly select columns to avoid error 42703 (undefined column)
+        # Total Safety: Explicitly select columns EXCLUDING min_threshold to avoid error 42703
         response = supabase.table("aviation_inventory").select(
-            "id, part_number, description, current_stock, min_threshold, barcode_id, uom"
+            "id, part_number, description, current_stock, barcode_id, uom"
         ).execute()
         
         low_stock_items = []
         if response.data:
             for row in response.data:
                 current_stock = float(row.get("current_stock", 0)) if row.get("current_stock") else 0
-                # Use default min_threshold=5 if missing
-                min_threshold = float(row.get("min_threshold", 5)) if row.get("min_threshold") else 5
+                # Python Filtering: Manually add min_threshold with default 5
+                row['min_threshold'] = row.get('min_threshold', 5)
+                min_threshold = float(row.get('min_threshold', 5))
                 
                 # Check if current_stock <= min_threshold
                 if current_stock <= min_threshold:
