@@ -254,16 +254,20 @@ async def dashboard(request: Request):
     greeting = get_time_greeting()
     supabase = get_supabase_client()
     
-    # Fail-Safe: Wrap stock fetching in try/except to prevent page crashes
+    # Total Safety: Wrap stock fetching in try/except to prevent page crashes
+    # Explicit columns EXCLUDING min_threshold to avoid error 42703
     try:
-        # Explicitly use table name 'aviation_inventory' (lowercase, exactly as in Supabase)
+        # Fetch items with EXPLICIT columns - EXCLUDING min_threshold
         response = supabase.table("aviation_inventory").select(
-            "id, part_number, description, current_stock, min_threshold"
+            "id, part_number, description, current_stock"
         ).execute()
         
+        # Python Filtering: Manually add min_threshold with default 5
         all_items = response.data if response.data else []
+        for item in all_items:
+            item['min_threshold'] = item.get('min_threshold', 5)
         
-        # Use item.get('min_threshold', 5) for safe low-stock calculation
+        # Filter in Python using the manually added min_threshold
         low_stock_items = [
             item for item in all_items 
             if float(item.get('current_stock', 0)) <= float(item.get('min_threshold', 5))
