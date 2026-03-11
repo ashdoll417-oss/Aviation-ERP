@@ -692,30 +692,106 @@ async def update_po_status(request: UpdatePOStatusRequest):
 async def stock(request: Request):
     """Stock page - displays inventory from Supabase."""
     greeting = get_time_greeting()
-    inventory = get_inventory_data()
-    
-    # Get suppliers list for preferred supplier dropdown
     supabase = get_supabase_client()
-    try:
-        suppliers_response = supabase.table("suppliers").select("id, supplier_name").execute()
-        suppliers = suppliers_response.data if suppliers_response.data else []
-    except Exception as e:
-        print(f"Error fetching suppliers: {e}")
-        suppliers = []
     
-    return templates.TemplateResponse(
-        "stock.html",
-        {
-            "request": request,
-            "greeting": greeting,
-            "page_title": "Stock Management",
-            "page_icon": "box-seam",
-            "paints": inventory["paints"],
-            "carpets": inventory["carpets"],
-            "low_stock": inventory["low_stock"],
-            "suppliers": suppliers
-        }
-    )
+    try:
+        # Fetch inventory including min_threshold
+        response = supabase.table("aviation_inventory").select(
+            "*, suppliers(id, supplier_name)"
+        ).execute()
+        
+        items = []
+        if response.data:
+            for item in response.data:
+                description = item.get("description", "").upper()
+                category = item.get("category", "").lower()
+                current_stock = float(item.get("current_stock", 0)) if item.get("current_stock") else 0
+                min_threshold = float(item.get("min_threshold", 5)) if item.get("min_threshold") else 5
+                uom = item.get("uom", "")
+                
+                # Get supplier info
+                suppliers = item.get("suppliers", [])
+                preferred_supplier_id = item.get("preferred_supplier_id")
+                preferred_supplier_name = None
+                if isinstance(suppliers, list) and len(suppliers) > 0:
+                    preferred_supplier_name = suppliers[0].get("supplier_name")
+                elif isinstance(suppliers, dict):
+                    preferred_supplier_name = suppliers.get("supplier_name")
+                
+                # Determine stock unit
+                stock_unit = uom
+                if 'AERMAT' in description or 'CARPET' in description:
+                    stock_unit = "Linear Meters"
+                
+                # Check if it's a carpet/flooring item
+                is_carpet = category == "carpet" or 'AERMAT' in description or 'CARPET' in description
+                
+                # Check if low stock (below min_threshold)
+                is_low_stock = current_stock <= min_threshold
+                
+                # Determine color/type for display
+                color_type = ""
+                if 'AERMAT' in description:
+                    if 'BLUE' in description or '8451' in description:
+                        color_type = 'BLUE'
+                    elif 'GREY' in description or '992' in description:
+                        color_type = 'GREY'
+                if 'CARPET' in description:
+                    if 'WOVEN' in description:
+                        color_type = 'WOVEN'
+                    elif 'ECONYL' in description or 'RIPS' in description:
+                        color_type = 'ECONYL RIPS'
+                
+                item_data = {
+                    "part_number": item.get("part_number", ""),
+                    "description": item.get("description", ""),
+                    "current_stock": current_stock,
+                    "min_threshold": min_threshold,
+                    "uom": uom,
+                    "stock_unit": stock_unit,
+                    "stock_display": f"{current_stock} {stock_unit}" if current_stock > 0 else "Out of Stock",
+                    "is_available": current_stock > 0,
+                    "is_low_stock": is_low_stock,
+                    "preferred_supplier_id": preferred_supplier_id,
+                    "preferred_supplier_name": preferred_supplier_name,
+                    "color_type": color_type,
+                    "category": category
+                }
+                items.append(item_data)
+        
+        # Get suppliers list for preferred supplier dropdown
+        try:
+            suppliers_response = supabase.table("suppliers").select("id, supplier_name").execute()
+            suppliers = suppliers_response.data if suppliers_response.data else []
+        except Exception as e:
+            print(f"Error fetching suppliers: {e}")
+            suppliers = []
+        
+        return templates.TemplateResponse(
+            "stock.html",
+            {
+                "request": request,
+                "greeting": greeting,
+                "page_title": "Stock Management",
+                "page_icon": "box-seam",
+                "items": items,
+                "suppliers": suppliers
+            }
+        )
+        
+    except Exception as e:
+        print(f"Error fetching stock: {e}")
+        return templates.TemplateResponse(
+            "stock.html",
+            {
+                "request": request,
+                "greeting": greeting,
+                "page_title": "Stock Management",
+                "page_icon": "box-seam",
+                "items": [],
+                "suppliers": []
+            }
+        )
 
 
 @app.post("/add-item")
@@ -735,7 +811,7 @@ async def add_item(request: Request):
     batch_no = form_data.get("batch_no", "").strip()
     expiry_date = form_data.get("expiry_date", "").strip()
     barcode_number = form_data.get("barcode_number", "").strip()
-    min_threshold = form_data.get("min_threshold", "10").strip()
+    min_threshold = form_data.get("min_threshold", "").strip()
     uom = form_data.get("uom", "KG").strip()
     
     if not part_number or not description:
@@ -744,16 +820,20 @@ async def add_item(request: Request):
     try:
         supabase = get_supabase_client()
         
-        # Parse values, default to 0 or 10 if invalid
+        # Parse values, default to 0 for current_stock, and 5 for min_threshold if blank
         try:
             current_stock_value = float(current_stock) if current_stock else 0
         except ValueError:
             current_stock_value = 0
             
-        try:
-            min_threshold_value = float(min_threshold) if min_threshold else 10
-        except ValueError:
-            min_threshold_value = 10
+        # Default to 5 if min_threshold is blank or invalid
+        if not min_threshold:
+            min_threshold_value = 5
+        else:
+            try:
+                min_threshold_value = float(min_threshold)
+            except ValueError:
+                min_threshold_value = 5
         
         # Insert into aviation_inventory table
         new_item = {
