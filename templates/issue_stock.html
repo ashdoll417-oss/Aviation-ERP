@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Issue Stock - Aviation ERP{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8 animate-fade-in">
+    <h1 class="text-2xl font-semibold text-primary flex items-center gap-3">
+        <i class="bi bi-box-arrow-up"></i> Issue Stock
+    </h1>
+    <nav class="mt-2 text-sm text-gray-500">
+        <a href="/" class="hover:text-secondary">Dashboard</a> / <span class="text-secondary">Issue Stock</span>
+    </nav>
+</div>
+
+<div class="max-w-2xl mx-auto">
+    <!-- Barcode Scanner Input -->
+    <div class="bg-white rounded-xl shadow-lg p-8 mb-8 animate-fade-in">
+        <label class="block text-xl font-semibold text-gray-700 mb-4 text-center">
+            SCAN BARCODE TO ISSUE
+        </label>
+        <input type="text" 
+               id="barcodeScanner" 
+               class="w-full px-6 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-secondary text-center text-2xl font-mono"
+               placeholder="Ready to scan..."
+               autofocus>
+        <p class="text-sm text-gray-500 mt-3 text-center">
+            Use your barcode scanner or type the barcode and press Enter
+        </p>
+    </div>
+
+    <!-- Product Details (Hidden until scanned) -->
+    <div id="productDetails" class="hidden bg-white rounded-xl shadow-lg p-6 animate-fade-in">
+        <div class="bg-gradient-to-r from-blue-500 to-teal-500 px-6 py-4 rounded-t-xl">
+            <h3 class="text-white text-lg font-semibold flex items-center gap-2">
+                <i class="bi bi-check-circle"></i> Product Found
+            </h3>
+        </div>
+        
+        <div class="p-6">
+            <form id="issueForm">
+                <input type="hidden" id="productPartNumber">
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500 mb-1">Part Number</label>
+                        <p id="displayPartNumber" class="text-lg font-semibold text-gray-900">-</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-500 mb-1">Category</label>
+                        <p id="displayCategory" class="text-lg font-semibold text-gray-900">-</p>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Description</label>
+                    <p id="displayDescription" class="text-lg font-semibold text-gray-900">-</p>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Current Stock</label>
+                    <p id="displayCurrentStock" class="text-2xl font-bold text-green-600">-</p>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Quantity to Issue *</label>
+                    <input type="number" 
+                           id="issueQuantity" 
+                           min="0.01" 
+                           step="0.01" 
+                           required
+                           class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent text-lg"
+                           placeholder="Enter quantity">
+                    <p id="stockWarning" class="hidden text-red-500 text-sm mt-1">
+                        Warning: Quantity exceeds available stock!
+                    </p>
+                </div>
+                
+                <button type="submit" 
+                        class="w-full px-6 py-4 bg-secondary hover:bg-blue-600 text-white rounded-lg font-semibold text-lg transition-colors flex items-center justify-center gap-2">
+                    <i class="bi bi-check-lg"></i> Confirm Issue
+                </button>
+                
+                <button type="button" 
+                        onclick="resetForm()"
+                        class="w-full mt-3 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors">
+                    Scan Another Item
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Success Message -->
+    <div id="successMessage" class="hidden bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-xl animate-fade-in">
+        <div class="flex items-center gap-3">
+            <i class="bi bi-check-circle-fill text-2xl"></i>
+            <div>
+                <p class="font-semibold text-lg">Stock Issued Successfully!</p>
+                <p id="successDetails" class="text-sm"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease forwards;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentProduct = null;
+    let currentStock = 0;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        const barcodeInput = document.getElementById('barcodeScanner');
+        
+        // Auto-focus on page load
+        setTimeout(function() {
+            barcodeInput.focus();
+        }, 100);
+        
+        // Handle barcode scan (Enter key)
+        barcodeInput.addEventListener('keypress', async function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const barcode = this.value.trim();
+                
+                if (barcode) {
+                    await lookupProduct(barcode);
+                }
+            }
+        });
+        
+        // Issue form submission
+        document.getElementById('issueForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await issueStock();
+        });
+        
+        // Quantity validation
+        document.getElementById('issueQuantity').addEventListener('input', function() {
+            const quantity = parseFloat(this.value);
+            const warning = document.getElementById('stockWarning');
+            
+            if (quantity > currentStock) {
+                warning.classList.remove('hidden');
+            } else {
+                warning.classList.add('hidden');
+            }
+        });
+    });
+    
+    async function lookupProduct(barcode) {
+        try {
+            const response = await fetch(`/api/product/search?q=${encodeURIComponent(barcode)}`);
+            const data = await response.json();
+            
+            if (data.success && data.product) {
+                currentProduct = data.product;
+                currentStock = data.product.current_stock;
+                
+                // Display product details
+                document.getElementById('productPartNumber').value = data.product.part_number;
+                document.getElementById('displayPartNumber').textContent = data.product.part_number;
+                document.getElementById('displayCategory').textContent = data.product.category || '-';
+                document.getElementById('displayDescription').textContent = data.product.description || '-';
+                document.getElementById('displayCurrentStock').textContent = data.product.current_stock + ' ' + (data.product.uom || 'units');
+                
+                // Show product details, hide scanner
+                document.getElementById('productDetails').classList.remove('hidden');
+                document.getElementById('barcodeScanner').value = '';
+                
+                // Focus on quantity input
+                document.getElementById('issueQuantity').focus();
+            } else {
+                alert('Product not found! Please check the barcode.');
+                document.getElementById('barcodeScanner').value = '';
+                document.getElementById('barcodeScanner').focus();
+            }
+        } catch (error) {
+            console.error('Error looking up product:', error);
+            alert('Error looking up product. Please try again.');
+        }
+    }
+    
+    async function issueStock() {
+        const partNumber = document.getElementById('productPartNumber').value;
+        const quantity = parseFloat(document.getElementById('issueQuantity').value);
+        
+        if (!partNumber || !quantity || quantity <= 0) {
+            alert('Please enter a valid quantity');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/product/issue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    part_number: partNumber,
+                    quantity: quantity
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Show success message
+                document.getElementById('successDetails').textContent = 
+                    `Issued ${quantity} units of ${partNumber}. New stock: ${data.new_stock}`;
+                document.getElementById('successMessage').classList.remove('hidden');
+                document.getElementById('productDetails').classList.add('hidden');
+                
+                // Auto-hide success message after 5 seconds
+                setTimeout(function() {
+                    document.getElementById('successMessage').classList.add('hidden');
+                }, 5000);
+                
+                // Reset for next scan
+                document.getElementById('issueQuantity').value = '';
+                document.getElementById('barcodeScanner').focus();
+            } else {
+                alert('Error: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error issuing stock:', error);
+            alert('Error issuing stock. Please try again.');
+        }
+    }
+    
+    function resetForm() {
+        document.getElementById('productDetails').classList.add('hidden');
+        document.getElementById('successMessage').classList.add('hidden');
+        document.getElementById('issueQuantity').value = '';
+        document.getElementById('barcodeScanner').value = '';
+        document.getElementById('barcodeScanner').focus();
+        currentProduct = null;
+        currentStock = 0;
+    }
+</script>
+{% endblock %}
+

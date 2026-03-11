@@ -681,6 +681,18 @@ async def issue_item_page(request: Request):
     })
 
 
+@app.get("/staff/issue")
+async def staff_issue_page(request: Request):
+    """
+    Staff Issue Stock page - simplified barcode scanner interface for issuing stock.
+    Single input box for scanning barcode, quick deduction from current_stock.
+    """
+    return templates.TemplateResponse("issue_stock.html", {
+        "request": request,
+        "greeting": get_greeting()
+    })
+
+
 @app.get("/api/product/search")
 async def search_product(q: str = Query(..., description="Search query (barcode or part number)")):
     """
@@ -755,6 +767,7 @@ async def issue_product(request: Request):
     """
     Issue/Subtract stock from a product.
     Used by the barcode scanner interface.
+    Records the transaction in stock_logs table.
     """
     from fastapi.responses import JSONResponse
     
@@ -797,6 +810,19 @@ async def issue_product(request: Request):
         supabase.table("aviation_inventory").update({
             "current_stock": new_stock
         }).eq("part_number", part_number).execute()
+        
+        # Record transaction in stock_logs
+        try:
+            supabase.table("stock_logs").insert({
+                "part_number": part_number,
+                "transaction_type": "ISSUE",
+                "quantity": quantity,
+                "previous_stock": current_stock,
+                "new_stock": new_stock,
+                "notes": f"Issued via staff portal"
+            }).execute()
+        except Exception as log_error:
+            print(f"Error logging stock transaction: {log_error}")
         
         return {
             "success": True,
