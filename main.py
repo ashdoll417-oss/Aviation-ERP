@@ -294,7 +294,7 @@ def get_low_stock_items() -> List[dict]:
         if response.data:
             for row in response.data:
                 current_stock = float(row.get("current_stock", 0)) if row.get("current_stock") else 0
-                min_threshold = float(row.get("min_threshold", 10)) if row.get("min_threshold") else 10
+                min_threshold = float(row.get("min_threshold", 5)) if row.get("min_threshold") else 5
                 
                 # Check if current_stock <= min_threshold
                 if current_stock <= min_threshold:
@@ -656,7 +656,7 @@ async def add_item(request: Request):
     batch_no = form_data.get("batch_no", "").strip()
     expiry_date = form_data.get("expiry_date", "").strip()
     barcode_number = form_data.get("barcode_number", "").strip()
-    min_threshold = form_data.get("min_threshold", "10").strip()
+    min_threshold = form_data.get("min_threshold", "5").strip()
     
     if not part_number or not description:
         # Redirect back to stock with error (could add error handling)
@@ -665,11 +665,11 @@ async def add_item(request: Request):
     try:
         supabase = get_supabase_client()
         
-        # Parse min_threshold, default to 10 if invalid
+        # Parse min_threshold, default to 5 if invalid, convert to integer
         try:
-            min_threshold_value = float(min_threshold) if min_threshold else 10
+            min_threshold_value = int(min_threshold) if min_threshold else 5
         except ValueError:
-            min_threshold_value = 10
+            min_threshold_value = 5
         
         # Insert into aviation_inventory table
         new_item = {
@@ -1046,7 +1046,7 @@ async def issue_product(request: Request):
             )
         
         current_stock = float(response.data[0].get("current_stock", 0)) if response.data[0].get("current_stock") else 0
-        min_threshold = float(response.data[0].get("min_threshold", 10)) if response.data[0].get("min_threshold") else 10
+        min_threshold = float(response.data[0].get("min_threshold", 5)) if response.data[0].get("min_threshold") else 5
         new_stock = current_stock - quantity
         
         # Ensure stock doesn't go negative
@@ -1155,7 +1155,7 @@ async def staff_issue_product(request: Request):
         
         product = response.data[0]
         current_stock = float(product.get("current_stock", 0)) if product.get("current_stock") else 0
-        min_threshold = float(product.get("min_threshold", 10)) if product.get("min_threshold") else 10
+        min_threshold = float(product.get("min_threshold", 5)) if product.get("min_threshold") else 5
         description = product.get("description", "")
         
         # Check if enough stock

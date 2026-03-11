@@ -153,7 +153,7 @@ def get_inventory_data() -> Dict[str, List[Dict[str, Any]]]:
             description = item.get("description", "").upper()
             category = item.get("category", "").lower()
             current_stock = float(item.get("current_stock", 0)) if item.get("current_stock") else 0
-            min_threshold = float(item.get("min_threshold", 10)) if item.get("min_threshold") else 10
+            min_threshold = float(item.get("min_threshold", 5)) if item.get("min_threshold") else 5
             uom = item.get("uom", "")
             
             # Get supplier info
@@ -829,12 +829,12 @@ async def add_item(request: Request):
         except ValueError:
             current_stock_value = 0
             
-        # Default to 5 if min_threshold is blank or invalid
+        # Default to 5 if min_threshold is blank or invalid, convert to integer
         if not min_threshold:
             min_threshold_value = 5
         else:
             try:
-                min_threshold_value = float(min_threshold)
+                min_threshold_value = int(min_threshold)
             except ValueError:
                 min_threshold_value = 5
         
@@ -1341,7 +1341,7 @@ async def staff_issue_product(request: Request):
         
         product = response.data[0]
         current_stock = float(product.get("current_stock", 0)) if product.get("current_stock") else 0
-        min_threshold = float(product.get("min_threshold", 10)) if product.get("min_threshold") else 10
+        min_threshold = float(product.get("min_threshold", 5)) if product.get("min_threshold") else 5
         description = product.get("description", "")
         
         # Check if enough stock

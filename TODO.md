@@ -1,27 +1,21 @@
-# Quick Order Feature Implementation
+# TODO: Update min_threshold to be bulletproof
 
-## Task: Update Admin Dashboard with 'Quick Order' Feature
+## Changes Required:
 
-### Steps:
+### 1. main.py Updates
+- [ ] 1.1 Update `get_low_stock_items()` function - change default from 10 to 5
+- [ ] 1.2 Update `/add-item` route - convert min_threshold to integer, default to 5
+- [ ] 1.3 Update `/api/product/issue` endpoint - change default from 10 to 5
+- [ ] 1.4 Update `/api/staff/issue` endpoint - change default from 10 to 5
 
-1. [x] **Database**: Add `preferred_supplier_id` column to `aviation_inventory` table
-2. [x] **Backend**: Update inventory data to fetch supplier info and add supplier API
-3. [x] **Stock Page**: Add Low Stock Alert section with animate-pulse and "Generate PO" buttons
-4. [x] **Stock Page**: Add preferred supplier dropdown for each item
-5. [x] **Purchase Order Page**: Auto-select supplier when redirecting from low stock alert
-6. [x] **Backend**: Add API endpoint to update preferred supplier for items
+### 2. admin_dashboard.py Updates
+- [ ] 2.1 Update `get_inventory_data()` function - change default from 10 to 5
+- [ ] 2.2 Update `/stock` endpoint - already uses 5 (verified)
+- [ ] 2.3 Update `/add-item` route - change float to int conversion, default to 5
+- [ ] 2.4 Update `/api/staff/issue` endpoint - change default from 10 to 5
 
-### Status: COMPLETED ✅
-
-### Summary of Changes:
-- Added `preferred_supplier_id` column to `aviation_inventory` table in `aviation_inventory.sql`
-- Updated `get_inventory_data()` in `admin_dashboard.py` to include supplier info and low_stock items
-- Added `/api/suppliers` endpoint to get all suppliers
-- Added `/api/inventory/update-supplier` endpoint to update preferred supplier
-- Updated `/stock` route to pass suppliers and low_stock data to template
-- Updated `templates/stock.html` with:
-  - Low Stock Alert section with `animate-pulse` class (flashing red box)
-  - "🛒 Generate PO" button for each low-stock item
-  - Preferred supplier dropdown to select supplier from
-- Updated `templates/purchase_order.html` to auto-select supplier when redirecting with `supplier_id` parameter
+## Completion Criteria:
+- All min_threshold defaults are now 5
+- Low stock filter uses explicit .get('min_threshold', 5)
+- Add item routes convert min_threshold to integer
 
