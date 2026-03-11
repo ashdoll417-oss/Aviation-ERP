@@ -106,6 +106,7 @@ const limit = 10;
 // Sample data - in production this would come from an API
 const sampleOrders = [
     {
+        id: '1',
         order_number: 'ORD-2024-001',
         date: '2024-01-15',
         customer: 'Kenya Airways',
@@ -114,6 +115,7 @@ const sampleOrders = [
         status: 'Completed'
     },
     {
+        id: '2',
         order_number: 'ORD-2024-002',
         date: '2024-01-14',
         customer: 'Safaricom',
@@ -122,6 +124,7 @@ const sampleOrders = [
         status: 'Completed'
     },
     {
+        id: '3',
         order_number: 'ORD-2024-003',
         date: '2024-01-13',
         customer: 'Kenya Power',
@@ -167,12 +170,12 @@ function renderOrders(orders) {
                 </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-center">
-                <button onclick="viewOrder('${order.order_number}')" class="text-secondary hover:text-blue-800 mr-3">
+                <a href="/orders/view/${order.id}" target="_blank" class="text-secondary hover:text-blue-800 me-3">
                     <i class="bi bi-eye"></i> View
-                </button>
-                <button onclick="printOrder('${order.order_number}')" class="text-gray-600 hover:text-gray-800">
+                </a>
+                <a href="/orders/view/${order.id}" target="_blank" class="text-gray-600 hover:text-gray-800">
                     <i class="bi bi-printer"></i> Print
-                </button>
+                </a>
             </td>
         </tr>
     `).join('');

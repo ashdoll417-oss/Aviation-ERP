@@ -1201,6 +1201,117 @@ async def delete_supplier(supplier_id: str):
 
 
 # =============================================================================
+# ORDER VIEW/PRINT ROUTES
+# =============================================================================
+
+@app.get("/orders/view/{order_id}")
+async def view_order(request: Request, order_id: str):
+    """
+    View and print order details - renders order_print.html with order data.
+    """
+    supabase = get_supabase_client()
+    
+    try:
+        # Try to fetch from purchase_orders table first
+        response = supabase.table("purchase_orders").select("*").eq("id", order_id).execute()
+        
+        if response.data and len(response.data) > 0:
+            order = response.data[0]
+            
+            # Fetch order items
+            items_response = supabase.table("purchase_order_items").select("*").eq("po_id", order_id).execute()
+            items = items_response.data if items_response.data else []
+            
+            # Format dates
+            po_date = order.get("po_date", "")
+            if po_date:
+                try:
+                    dt = datetime.strptime(po_date, "%Y-%m-%d")
+                    po_date = dt.strftime("%d/%m/%Y")
+                except:
+                    pass
+            
+            created_at = order.get("created_at", "")
+            if created_at:
+                try:
+                    dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    created_at = dt.strftime("%d/%m/%Y %H:%M")
+                except:
+                    pass
+            
+            order_data = {
+                "order_number": order.get("po_number", ""),
+                "order_date": po_date,
+                "supplier": order.get("supplier", ""),
+                "total": float(order.get("total_usd", 0)) if order.get("total_usd") else 0,
+                "status": order.get("status", ""),
+                "created_at": created_at,
+                "items": items,
+                "order_type": "Purchase Order"
+            }
+            
+            return templates.TemplateResponse("order_print.html", {
+                "request": request,
+                "greeting": get_greeting(),
+                "order": order_data
+            })
+        
+        # Try sales_quotes table
+        quote_response = supabase.table("sales_quotes").select("*").eq("id", order_id).execute()
+        
+        if quote_response.data and len(quote_response.data) > 0:
+            quote = quote_response.data[0]
+            
+            # Fetch quote items
+            items_response = supabase.table("sales_quote_items").select("*").eq("quote_id", order_id).execute()
+            items = items_response.data if items_response.data else []
+            
+            # Format dates
+            quote_date = quote.get("created_at", "")
+            if quote_date:
+                try:
+                    dt = datetime.fromisoformat(quote_date.replace('Z', '+00:00'))
+                    quote_date = dt.strftime("%d/%m/%Y %H:%M")
+                except:
+                    pass
+            
+            order_data = {
+                "order_number": quote.get("quote_number", ""),
+                "order_date": quote_date,
+                "customer": quote.get("customer_name", ""),
+                "customer_email": quote.get("customer_email", ""),
+                "customer_phone": quote.get("customer_phone", ""),
+                "total": float(quote.get("grand_total", 0)) if quote.get("grand_total") else 0,
+                "status": quote.get("status", ""),
+                "created_at": quote_date,
+                "items": items,
+                "order_type": "Sales Quote"
+            }
+            
+            return templates.TemplateResponse("order_print.html", {
+                "request": request,
+                "greeting": get_greeting(),
+                "order": order_data
+            })
+        
+        # Order not found
+        return templates.TemplateResponse("order_print.html", {
+            "request": request,
+            "greeting": get_greeting(),
+            "order": None,
+            "error": "Order not found"
+        })
+        
+    except Exception as e:
+        return templates.TemplateResponse("order_print.html", {
+            "request": request,
+            "greeting": get_greeting(),
+            "order": None,
+            "error": str(e)
+        })
+
+
+# =============================================================================
 # STOCK LOGS ROUTES
 # =============================================================================
 
