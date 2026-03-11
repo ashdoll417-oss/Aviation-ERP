@@ -1,13 +1,19 @@
-# TODO - Stock Route Update
+# TODO - Completed Tasks
 
-## Task: Update /stock route and stock.html with Batch Number and Expiry Date fields
+## Stock Route Update (Completed)
+- Database schema updated with expiry_date column
+- Backend routes updated with batch_no and expiry_date handling
+- Frontend template with smart validation (Paint = required, Carpet = optional)
+- Expiry highlighting (red for items within 30 days)
 
-### Steps:
+## Suppliers Section (Completed)
+- Added Suppliers to navigation sidebar in base.html
+- Created suppliers.html page with manual entry form
+- Added /suppliers route in main.py
+- Created suppliers.sql for database table
+- Updated Purchase Order page with supplier dropdown integration
+- Added API endpoints for suppliers
 
-- [x] 1. Update aviation_inventory.sql - Add expiry_date column
-- [x] 2. Update main.py - Update InventoryItem model, /add-item POST route, /stock GET route
-- [x] 3. Update templates/stock.html - Add form fields, JavaScript validation, update table display
-- [x] 4. Test the implementation
-
-### Status: Completed
+## Git Status
+- All changes committed and pushed to master:main
 
