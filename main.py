@@ -277,7 +277,7 @@ def is_expiring_soon(expiry_date_str: str) -> bool:
 def get_low_stock_items() -> List[dict]:
     """
     Get all items where current_stock <= min_threshold.
-    Each item has its own min_threshold value (default 10 if not set).
+    Each item has its own min_threshold value (default 5 if not set).
     
     Returns:
         List of low stock items with part_number, description, current_stock, min_threshold, uom
@@ -285,15 +285,16 @@ def get_low_stock_items() -> List[dict]:
     supabase = get_supabase_client()
     
     try:
-        # Fetch all items with their min_threshold values
+        # Explicitly select columns to avoid error 42703 (undefined column)
         response = supabase.table("aviation_inventory").select(
-            "part_number, description, current_stock, min_threshold, uom"
+            "id, part_number, description, current_stock, min_threshold, barcode_id, uom"
         ).execute()
         
         low_stock_items = []
         if response.data:
             for row in response.data:
                 current_stock = float(row.get("current_stock", 0)) if row.get("current_stock") else 0
+                # Use default min_threshold=5 if missing
                 min_threshold = float(row.get("min_threshold", 5)) if row.get("min_threshold") else 5
                 
                 # Check if current_stock <= min_threshold
@@ -310,6 +311,7 @@ def get_low_stock_items() -> List[dict]:
         return low_stock_items
     except Exception as e:
         print(f"Error fetching low stock items: {e}")
+        # Return empty list instead of crashing
         return []
 
 
@@ -440,8 +442,10 @@ async def get_inventory(
     supabase = get_supabase_client()
     
     try:
-        # Fetch all items from aviation_inventory table
-        response = supabase.table("aviation_inventory").select("*").execute()
+        # Explicitly select columns to avoid error 42703 (undefined column)
+        response = supabase.table("aviation_inventory").select(
+            "id, part_number, description, opening_stock, uom, cont, sold_stock, in_house, current_stock, min_threshold, batch_no, dom, expiry_date, category, barcode_number, preferred_supplier_id, unit_price_usd"
+        ).execute()
         
         if not response.data:
             return InventoryResponse(
@@ -567,8 +571,10 @@ async def stock_page(request: Request):
     supabase = get_supabase_client()
     
     try:
-        # Fetch all items from aviation_inventory table
-        response = supabase.table("aviation_inventory").select("*").execute()
+        # Explicitly select columns to avoid error 42703 (undefined column)
+        response = supabase.table("aviation_inventory").select(
+            "id, part_number, description, current_stock, uom, category, batch_no, expiry_date, min_threshold"
+        ).execute()
         
         # Separate paints and carpets
         paints = []

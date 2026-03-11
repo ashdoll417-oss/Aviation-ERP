@@ -137,9 +137,9 @@ def get_inventory_data() -> Dict[str, List[Dict[str, Any]]]:
     supabase = get_supabase_client()
     
     try:
-        # Fetch inventory with supplier info
+        # Explicitly select columns to avoid error 42703 (undefined column)
         response = supabase.table("aviation_inventory").select(
-            "*, suppliers(id, supplier_name)"
+            "id, part_number, description, current_stock, min_threshold, uom, category, preferred_supplier_id"
         ).execute()
         
         if not response.data:
@@ -153,17 +153,9 @@ def get_inventory_data() -> Dict[str, List[Dict[str, Any]]]:
             description = item.get("description", "").upper()
             category = item.get("category", "").lower()
             current_stock = float(item.get("current_stock", 0)) if item.get("current_stock") else 0
+            # Use default min_threshold=5 if missing
             min_threshold = float(item.get("min_threshold", 5)) if item.get("min_threshold") else 5
             uom = item.get("uom", "")
-            
-            # Get supplier info
-            suppliers = item.get("suppliers", [])
-            preferred_supplier_id = item.get("preferred_supplier_id")
-            preferred_supplier_name = suppliers[0].get("supplier_name") if suppliers else None if isinstance(suppliers, list) and len(suppliers) > 0 else None
-            
-            # If suppliers is a dict (single object), get the name directly
-            if isinstance(suppliers, dict):
-                preferred_supplier_name = suppliers.get("supplier_name")
             
             # Determine stock unit
             stock_unit = uom
@@ -186,8 +178,8 @@ def get_inventory_data() -> Dict[str, List[Dict[str, Any]]]:
                 "stock_display": f"{current_stock} {stock_unit}" if current_stock > 0 else "Out of Stock",
                 "is_available": current_stock > 0,
                 "is_low_stock": is_low_stock,
-                "preferred_supplier_id": preferred_supplier_id,
-                "preferred_supplier_name": preferred_supplier_name,
+                "preferred_supplier_id": item.get("preferred_supplier_id"),
+                "preferred_supplier_name": None,
                 # For carpets, add color/type info
                 "color_type": get_carpet_color_type(item.get("description", ""))
             }
@@ -209,6 +201,7 @@ def get_inventory_data() -> Dict[str, List[Dict[str, Any]]]:
         
     except Exception as e:
         print(f"Error fetching inventory: {e}")
+        # Return empty dict instead of crashing
         return {"paints": [], "carpets": [], "low_stock": []}
 
 
