@@ -762,10 +762,10 @@ async def stock(request: Request):
         # Get suppliers list for preferred supplier dropdown
         try:
             suppliers_response = supabase.table("suppliers").select("id, supplier_name").execute()
-            suppliers = suppliers_response.data if suppliers_response.data else []
+            suppliers_list = suppliers_response.data if suppliers_response.data else []
         except Exception as e:
             print(f"Error fetching suppliers: {e}")
-            suppliers = []
+            suppliers_list = []
         
         return templates.TemplateResponse(
             "stock.html",
@@ -775,7 +775,8 @@ async def stock(request: Request):
                 "page_title": "Stock Management",
                 "page_icon": "box-seam",
                 "items": items,
-                "suppliers": suppliers
+                "suppliers_list": suppliers_list,
+                "suppliers": suppliers_list  # Keep for backward compatibility
             }
         )
         
@@ -789,6 +790,7 @@ async def stock(request: Request):
                 "page_title": "Stock Management",
                 "page_icon": "box-seam",
                 "items": [],
+                "suppliers_list": [],
                 "suppliers": []
             }
         )
@@ -813,6 +815,7 @@ async def add_item(request: Request):
     barcode_id = form_data.get("barcode_id", "").strip()
     min_threshold = form_data.get("min_threshold", "").strip()
     uom = form_data.get("uom", "KG").strip()
+    preferred_supplier_id = form_data.get("preferred_supplier_id", "").strip()
     
     if not part_number or not description:
         return RedirectResponse(url="/stock", status_code=303)
@@ -845,6 +848,10 @@ async def add_item(request: Request):
             "uom": uom,
             "min_threshold": min_threshold_value
         }
+        
+        # Add preferred supplier if selected
+        if preferred_supplier_id:
+            new_item["preferred_supplier_id"] = preferred_supplier_id
         
         # Add batch number if provided
         if batch_no:
