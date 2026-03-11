@@ -37,9 +37,22 @@
         .animate-pulse-success {
             animation: pulse-success 0.5s ease;
         }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake {
+            animation: shake 0.5s ease;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-100 to-slate-200 min-h-screen flex flex-col">
+    
+    <!-- Audio element for beep sound -->
+    <audio id="beepSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU" type="audio/wav">
+    </audio>
     
     <!-- Top Bar with Logout and Issue Button -->
     <header class="bg-white shadow-sm sticky top-0 z-50">
@@ -49,9 +62,7 @@
                 <h1 class="text-xl font-semibold text-primary">AISL Aviation - Staff Portal</h1>
             </div>
             <div class="flex items-center gap-3">
-                <button onclick="showIssueHelp()" class="px-4 py-2 bg-secondary hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
-                    <i class="bi bi-question-circle"></i> Issue
-                </button>
+                <span id="currentStaff" class="text-sm text-gray-500 mr-2"></span>
                 <a href="/" onclick="return confirm('Are you sure you want to logout?')" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
                     <i class="bi bi-box-arrow-right"></i> Logout
                 </a>
@@ -73,10 +84,10 @@
                        autocomplete="off">
             </div>
 
-            <!-- Barcode Scanner Section -->
+            <!-- Barcode Scanner Section - SCAN AND GO -->
             <div class="bg-white rounded-xl shadow-lg p-8 animate-fade-in">
                 <label class="block text-xl font-semibold text-gray-700 mb-4 text-center">
-                    <i class="bi bi-upc-scan mr-2"></i>SCAN BARCODE
+                    <i class="bi bi-upc-scan mr-2"></i>SCAN BARCODE (Scan & Go)
                 </label>
                 
                 <input type="text" 
@@ -87,67 +98,13 @@
                        autocomplete="off">
                 
                 <p class="text-sm text-gray-500 mt-3 text-center">
-                    Use barcode scanner or type barcode and press Enter
+                    Scan barcode - auto-submits when Staff Name is entered
                 </p>
             </div>
 
-            <!-- Product Details (Hidden until scanned) -->
-            <div id="productDetails" class="hidden bg-white rounded-xl shadow-lg mt-6 animate-fade-in">
-                <div class="bg-gradient-to-r from-blue-500 to-teal-500 px-6 py-4 rounded-t-xl">
-                    <h3 class="text-white text-lg font-semibold flex items-center gap-2">
-                        <i class="bi bi-check-circle"></i> Product Found
-                    </h3>
-                </div>
-                
-                <div class="p-6">
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <p class="text-sm text-gray-500">Part Number</p>
-                            <p id="displayPartNumber" class="text-lg font-semibold text-gray-900">-</p>
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-500">Category</p>
-                            <p id="displayCategory" class="text-lg font-semibold text-gray-900">-</p>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <p class="text-sm text-gray-500">Description</p>
-                        <p id="displayDescription" class="text-lg font-semibold text-gray-900">-</p>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <p class="text-sm text-gray-500">Current Stock</p>
-                        <p id="displayCurrentStock" class="text-2xl font-bold text-green-600">-</p>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Quantity to Issue *</label>
-                        <input type="number" 
-                               id="quantity"
-                               min="0.01" 
-                               step="0.01" 
-                               value="1"
-                               required
-                               class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary focus:border-transparent text-lg"
-                               placeholder="Enter quantity">
-                        <p id="stockWarning" class="hidden text-red-500 text-sm mt-1">
-                            Warning: Quantity exceeds available stock!
-                        </p>
-                    </div>
-                    
-                    <button type="button" 
-                            onclick="submitIssue()"
-                            class="w-full px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-lg transition-colors flex items-center justify-center gap-2">
-                        <i class="bi bi-check-lg"></i> Confirm Issue
-                    </button>
-                    
-                    <button type="button" 
-                            onclick="resetForm()"
-                            class="w-full mt-3 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors">
-                        Scan Another Item
-                    </button>
-                </div>
+            <!-- Last Scanned Item Status -->
+            <div id="lastItemStatus" class="mt-4 p-4 rounded-xl hidden">
+                <!-- Will be populated dynamically -->
             </div>
         </div>
     </main>
@@ -163,16 +120,16 @@
         </div>
     </div>
 
-    <!-- ERROR Message Overlay -->
-    <div id="errorMessage" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl p-12 text-center shadow-2xl">
-            <div class="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+    <!-- ERROR Message Overlay - BRIGHT RED for Part Not Found -->
+    <div id="errorMessage" class="hidden fixed inset-0 bg-red-900/80 flex items-center justify-center z-50">
+        <div class="bg-red-600 rounded-2xl p-12 text-center shadow-2xl border-4 border-red-400">
+            <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6">
                 <i class="bi bi-x-circle-fill text-5xl text-red-600"></i>
             </div>
-            <h2 class="text-4xl font-bold text-red-600 mb-4">ERROR!</h2>
-            <p id="errorDetails" class="text-xl text-gray-700"></p>
-            <button onclick="closeError()" class="mt-6 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium">
-                Try Again
+            <h2 class="text-4xl font-bold text-white mb-4">PART NOT FOUND</h2>
+            <p id="errorDetails" class="text-xl text-yellow-200 font-bold">SCAN AGAIN</p>
+            <button onclick="closeError()" class="mt-6 px-6 py-3 bg-white text-red-600 hover:bg-gray-100 rounded-lg font-bold">
+                TRY AGAIN
             </button>
         </div>
     </div>
@@ -188,26 +145,10 @@
         </div>
     </div>
 
-    <!-- Help Modal -->
-    <div id="helpModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-2xl p-8 max-w-md shadow-2xl">
-            <h3 class="text-xl font-bold text-primary mb-4">How to Issue Stock</h3>
-            <ol class="list-decimal list-inside space-y-2 text-gray-700">
-                <li>Enter your Staff Name</li>
-                <li>Scan or type the Barcode ID</li>
-                <li>Verify the product details</li>
-                <li>Adjust quantity if needed (default: 1)</li>
-                <li>Click "Confirm Issue"</li>
-            </ol>
-            <button onclick="closeHelp()" class="mt-6 w-full px-6 py-3 bg-secondary hover:bg-blue-600 text-white rounded-lg font-medium">
-                Got it!
-            </button>
-        </div>
-    </div>
-
     <script>
         let currentProduct = null;
         let currentStock = 0;
+        let isProcessing = false;
         
         document.addEventListener('DOMContentLoaded', function() {
             const barcodeInput = document.getElementById('barcodeId');
@@ -220,112 +161,123 @@
             
             // Keep barcode input focused - if user clicks anywhere else, jump back
             document.addEventListener('click', function(e) {
-                // Don't refocus if clicking on buttons, inputs in product details, or modals
+                // Don't refocus if clicking on buttons, inputs, or modals
                 const target = e.target;
                 const isButton = target.tagName === 'BUTTON' || target.tagName === 'A';
-                const isInProductDetails = document.getElementById('productDetails').contains(target);
-                const isInModal = target.closest('#successMessage, #errorMessage, #helpModal, #lowStockWarning');
+                const isInput = target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA';
+                const isInModal = target.closest('#successMessage, #errorMessage, #lowStockWarning');
                 
-                if (!isButton && !isInProductDetails && !isInModal) {
+                if (!isButton && !isInput && !isInModal) {
                     barcodeInput.focus();
                 }
             });
             
-            // Handle barcode scan (Enter key)
+            // Handle barcode scan (Enter key) - AUTO SUBMIT
             barcodeInput.addEventListener('keypress', async function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     const barcode = this.value.trim();
                     
-                    if (barcode) {
-                        await lookupProduct(barcode);
+                    if (barcode && !isProcessing) {
+                        await lookupAndAutoSubmit(barcode);
                     }
                 }
             });
             
-            // Quantity validation
-            document.getElementById('quantity').addEventListener('input', function() {
-                const quantity = parseFloat(this.value);
-                const warning = document.getElementById('stockWarning');
-                
-                if (quantity > currentStock && currentStock > 0) {
-                    warning.classList.remove('hidden');
-                } else {
-                    warning.classList.add('hidden');
-                }
+            // Also handle input change for scanners that don't send Enter
+            barcodeInput.addEventListener('input', async function() {
+                // Some scanners auto-submit, wait a moment to see if Enter was pressed
+                // This is a backup for scanners that don't send Enter key
             });
             
             // Staff name - save to localStorage for convenience
             const savedStaffName = localStorage.getItem('staffName');
             if (savedStaffName) {
                 staffNameInput.value = savedStaffName;
+                document.getElementById('currentStaff').textContent = '👤 ' + savedStaffName;
             }
             
             staffNameInput.addEventListener('change', function() {
                 localStorage.setItem('staffName', this.value);
+                document.getElementById('currentStaff').textContent = '👤 ' + this.value;
+            });
+            
+            // Also update display when staff name changes
+            staffNameInput.addEventListener('input', function() {
+                if (this.value.trim()) {
+                    document.getElementById('currentStaff').textContent = '👤 ' + this.value.trim();
+                } else {
+                    document.getElementById('currentStaff').textContent = '';
+                }
             });
         });
         
-        async function lookupProduct(barcode) {
+        // Play beep sound for error
+        function playBeep() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800; // Hz
+                oscillator.type = 'square';
+                gainNode.gain.value = 0.3;
+                
+                oscillator.start();
+                
+                // Beep pattern: 3 short beeps
+                setTimeout(() => { oscillator.stop(); }, 150);
+            } catch (e) {
+                console.log('Audio beep failed:', e);
+            }
+        }
+        
+        // Lookup product and auto-submit if staff name exists
+        async function lookupAndAutoSubmit(barcode) {
             const staffName = document.getElementById('staffName').value.trim();
             
             if (!staffName) {
-                showError('Please enter your Staff Name first');
+                // No staff name - show error with shake animation
+                showError('Please enter Staff Name first');
                 document.getElementById('staffName').focus();
                 return;
             }
+            
+            isProcessing = true;
             
             try {
                 const response = await fetch(`/api/product/search?q=${encodeURIComponent(barcode)}`);
                 const data = await response.json();
                 
                 if (data.success && data.product) {
+                    // Product found - auto-submit the issue
                     currentProduct = data.product;
                     currentStock = data.product.current_stock;
                     
-                    // Display product details
-                    document.getElementById('displayPartNumber').textContent = data.product.part_number;
-                    document.getElementById('displayCategory').textContent = data.product.category || '-';
-                    document.getElementById('displayDescription').textContent = data.product.description || '-';
-                    document.getElementById('displayCurrentStock').textContent = data.product.current_stock + ' ' + (data.product.uom || 'units');
-                    
-                    // Show product details, hide scanner temporarily
-                    document.getElementById('productDetails').classList.remove('hidden');
-                    document.getElementById('barcodeId').value = '';
-                    
-                    // Focus on quantity input
-                    document.getElementById('quantity').focus();
-                    document.getElementById('quantity').select();
+                    // Auto-submit with default quantity of 1
+                    await autoSubmitIssue(1);
                 } else {
-                    showError('Product not found! Please check the barcode.');
+                    // Product NOT FOUND - play beep and show bright red error
+                    playBeep();
+                    showPartNotFoundError();
                     document.getElementById('barcodeId').value = '';
                     document.getElementById('barcodeId').focus();
                 }
             } catch (error) {
                 console.error('Error looking up product:', error);
                 showError('Error looking up product. Please try again.');
+            } finally {
+                isProcessing = false;
             }
         }
         
-        async function submitIssue() {
+        // Auto submit issue with quantity
+        async function autoSubmitIssue(quantity) {
             const staffName = document.getElementById('staffName').value.trim();
             const partNumber = currentProduct.part_number;
-            const quantity = parseFloat(document.getElementById('quantity').value);
-            
-            if (!staffName) {
-                showError('Please enter your Staff Name');
-                return;
-            }
-            
-            if (!partNumber || !quantity || quantity <= 0) {
-                showError('Please enter a valid quantity');
-                return;
-            }
-            
-            if (quantity > currentStock) {
-                showError(`Insufficient stock! Available: ${currentStock}`);
-                return;
-            }
             
             try {
                 const response = await fetch('/api/staff/issue', {
@@ -345,26 +297,32 @@
                 if (data.success) {
                     // Show success message
                     document.getElementById('successDetails').textContent = 
-                        `Issued ${quantity} x ${partNumber}\nRemaining stock: ${data.new_stock}`;
+                        `✓ ${partNumber} - Qty: ${quantity} | Remaining: ${data.new_stock}`;
                     document.getElementById('successMessage').classList.remove('hidden');
                     
                     // Hide success after 3 seconds
                     setTimeout(function() {
                         document.getElementById('successMessage').classList.add('hidden');
-                        resetForm();
                     }, 3000);
                     
                     // Check for low stock warning
                     if (data.low_stock) {
                         document.getElementById('lowStockDetails').textContent = 
-                            `${partNumber} is now low on stock (${data.new_stock} remaining)`;
+                            `${partNumber} is low on stock (${data.new_stock} remaining)`;
                         document.getElementById('lowStockWarning').classList.remove('hidden');
                         
-                        // Auto-hide low stock warning after 5 seconds
                         setTimeout(function() {
                             document.getElementById('lowStockWarning').classList.add('hidden');
                         }, 5000);
                     }
+                    
+                    // SCAN AND GO: Clear ONLY barcode field, keep Staff Name for next scan
+                    document.getElementById('barcodeId').value = '';
+                    document.getElementById('barcodeId').focus();
+                    
+                    // Update last item status
+                    updateLastItemStatus(partNumber, quantity, data.new_stock, data.low_stock);
+                    
                 } else {
                     showError(data.detail || 'Unknown error occurred');
                 }
@@ -374,32 +332,52 @@
             }
         }
         
+        // Update the last item status display
+        function updateLastItemStatus(partNumber, quantity, newStock, isLowStock) {
+            const statusDiv = document.getElementById('lastItemStatus');
+            const borderColor = isLowStock ? 'border-yellow-400 bg-yellow-50' : 'border-green-400 bg-green-50';
+            const textColor = isLowStock ? 'text-yellow-800' : 'text-green-800';
+            
+            statusDiv.className = `mt-4 p-4 rounded-xl border-2 ${borderColor} ${textColor}`;
+            statusDiv.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-bold text-lg">${partNumber}</p>
+                        <p class="text-sm">Issued: ${quantity}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-xl">${newStock}</p>
+                        <p class="text-sm">remaining</p>
+                        ${isLowStock ? '<p class="text-xs text-red-600 font-bold">⚠ LOW STOCK</p>' : ''}
+                    </div>
+                </div>
+            `;
+            statusDiv.classList.remove('hidden');
+        }
+        
         function showError(message) {
             document.getElementById('errorDetails').textContent = message;
             document.getElementById('errorMessage').classList.remove('hidden');
+            document.getElementById('errorMessage').classList.add('animate-shake');
+            
+            setTimeout(() => {
+                document.getElementById('errorMessage').classList.remove('animate-shake');
+            }, 500);
+        }
+        
+        // Show bright red PART NOT FOUND error
+        function showPartNotFoundError() {
+            document.getElementById('errorMessage').classList.remove('hidden');
+            document.getElementById('errorMessage').classList.add('animate-shake');
+            
+            setTimeout(() => {
+                document.getElementById('errorMessage').classList.remove('animate-shake');
+            }, 500);
         }
         
         function closeError() {
             document.getElementById('errorMessage').classList.add('hidden');
             document.getElementById('barcodeId').focus();
-        }
-        
-        function resetForm() {
-            document.getElementById('productDetails').classList.add('hidden');
-            document.getElementById('quantity').value = '1';
-            document.getElementById('stockWarning').classList.add('hidden');
-            document.getElementById('barcodeId').value = '';
-            document.getElementById('barcodeId').focus();
-            currentProduct = null;
-            currentStock = 0;
-        }
-        
-        function showIssueHelp() {
-            document.getElementById('helpModal').classList.remove('hidden');
-        }
-        
-        function closeHelp() {
-            document.getElementById('helpModal').classList.add('hidden');
         }
     </script>
 </body>
