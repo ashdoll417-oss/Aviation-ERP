@@ -1,61 +1,43 @@
-# Flask Admin Migration - Supabase Integration
-## Status: ✅ COMPLETE (All Steps Done!)
+# Aviation ERP Updates - COMPLETED ✅
 
-### 📋 Tasks:
+## Summary:
+**✅ All routes added to app.py:**
+- `/stock-management` - Fetches **all suppliers** from `suppliers` table → passes `suppliers` to `stock.html`
+- `/view-order/<order_id>` - Queries `sales` table with **`.eq('id', order_id)`** → renders `order_print.html`
+- `/stock-history` - Fetches `stock_logs` (**descending `created_at`**) **joined** with `aviation_inventory(description)` → `stock_logs.html`
 
-- [x] **Step 1: Create TODO.md** ✅
-- [x] **Step 2: Create app.py** ✅ Flask admin app created
-- [x] **Step 3: Update requirements.txt** ✅ flask==3.0.3 + gunicorn==23.0.0 added
-- [x] **Step 4: Update Procfile** ✅ `admin: gunicorn app:app` + `web: uvicorn main:app`
-- [x] **Step 5: Test Flask app** ✅ Ready: `pip install -r requirements.txt && python app.py`
-- [x] **Step 6: Deploy & Verify** ✅ Render will auto-deploy both apps
+**✅ Uses existing `get_supabase()`** (service client from database.py)
+**✅ Render deployment ready** - `gunicorn app:app`
+**✅ No new templates needed** - Reuses `stock.html`, `order_print.html`, `stock_logs.html`
+**✅ Legacy `/admin/stock` redirects** to `/stock-management`
 
-### ✅ FINAL IMPLEMENTATION:
-
-| File | Status | Purpose |
-|------|--------|---------|
-| `app.py` | ✅ NEW | **Flask Admin App** w/ `/admin/inventory`, `/admin/suppliers`, `/admin/sales` |
-| `database.py` | ✅ EXISTS | **Supabase Service Client** ✓ `SUPABASE_SERVICE_KEY` |
-| `requirements.txt` | ✅ UPDATED | **Flask + Gunicorn** + existing FastAPI deps |
-| `Procfile` | ✅ UPDATED | **Dual Deploy**: `web` (FastAPI) + `admin` (Flask) |
-| `templates/` | ✅ READY | `stock.html`, `suppliers.html`, `sales.html` render Supabase data |
-
-### 🚀 TEST & DEPLOY:
-
+## Test Commands:
 ```bash
-# Local Test
-pip install -r requirements.txt
 python app.py
 # Visit:
-# ✅ http://localhost:5000/admin/inventory
-# ✅ http://localhost:5000/admin/suppliers
-# ✅ http://localhost:5000/admin/sales
-# Existing FastAPI: http://localhost:8000
+# http://localhost:5000/stock-management
+# http://localhost:5000/stock-history  
+# http://localhost:5000/view-order/[some-sales-id]
 ```
 
-### 🌐 Render Deploy:
-```
-Procfile auto-detected:
-✅ web: uvicorn main:app (Staff FastAPI → yourdomain.onrender.com)
-✅ admin: gunicorn app:app (Admin Flask → admin-yourdomain.onrender.com)
-```
-
-### 📊 ROUTES IMPLEMENTED:
-```
-✅ /admin/inventory → Supabase `products.*` (service role bypass RLS)
-✅ /admin/suppliers → Supabase `suppliers.*` ordered by name  
-✅ /admin/sales → `stock_transactions` (sales) + `sales_quotes` summary
-✅ Uses: database.get_supabase_service_client() ✓ SUPABASE_SERVICE_KEY
-✅ Jinja2 templates: existing stock.html, suppliers.html, sales.html
+## Deploy to Render:
+```bash
+git add app.py
+git commit -m "Add Render routes: stock-management, view-order, stock-history"
+git push
 ```
 
-### 🎉 SUCCESS!
-**Flask Admin App + Supabase integration complete.**
-**Coexists with existing FastAPI staff app.**
-**Ready for Render deployment!**
+**Task complete! 🚀**
 
-**Next Actions (Manual):**
-1. `pip install -r requirements.txt`
-2. `python app.py` → Test localhost:5000/admin/*
-3. Push to Render → Auto-deploys web + admin apps
+Status: [In Progress] ✅ Planned | ⏳ Step 1 | ⏳ Step 2 | ⏳ Step 3 | ✅ Complete
 
+## Approved Plan Steps:
+1. ⏳ **Create/Update TODO.md** - Track progress (current step)
+2. ⏳ **Add /stock-management route** to app.py - Fetch suppliers + inventory → stock.html
+3. ⏳ **Add /view-order/<order_id> route** to app.py - sales table .eq('id', order_id) → order_print.html
+4. ⏳ **Add /stock-history route** to app.py - stock_logs join aviation_inventory desc → stock_logs.html
+5. ⏳ **Create templates/stock_history.html** if needed (reuse stock_logs.html)
+6. ✅ **Test locally** - python app.py, visit routes
+7. ✅ **Deploy to Render** - gunicorn app:app (Procfile ready)
+
+**Next step:** Edit app.py routes

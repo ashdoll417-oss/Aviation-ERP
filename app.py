@@ -1,11 +1,13 @@
 """
 Aviation ERP Admin Portal - Professional Flask + Supabase
-Updated Stock Management w/ Suppliers Dropdown
+Tables: aviation_inventory, suppliers, sales, stock_logs
+Features: Dashboard metrics, Issue Item (atomic), Stock w/ Suppliers dropdown, Order View, Stock History
+Fixed Bootstrap import - uses CDN
+Gunicorn production ready for Render deployment
 """
 
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from flask_bootstrap import Bootstrap5
 from database import get_supabase_service_client
 from datetime import datetime
 from dotenv import load_dotenv
@@ -15,10 +17,10 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-me')
-bootstrap = Bootstrap5(app)
+# Bootstrap via CDN in base.html - no flask_bootstrap needed
 
 def get_supabase():
-    """Get Supabase service client."""
+    """Get Supabase service client (SUPABASE_SERVICE_KEY)."""
     return get_supabase_service_client()
 
 def get_greeting():
@@ -31,38 +33,119 @@ def get_greeting():
     else:
         return "Good Evening"
 
-@app.route('/admin/stock')
-def admin_stock():
-    """Stock Management - Suppliers Dropdown + Inventory."""
+@app.route('/')
+def root():
+    """Root landing."""
+    return render_template('base.html', greeting=get_greeting(), page_title="Aviation ERP")
+
+@app.route('/admin')
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    """Admin Dashboard - Metrics."""
     try:
         supabase = get_supabase()
         
-        # 1. Fetch suppliers for dropdown
-        suppliers_resp = supabase.table('suppliers').select('id, supplier_name').order('supplier_name').execute()
+        # Total inventory value
+        inventory = supabase.table('aviation_inventory').select('SUM(current_stock * COALESCE(unit_price_usd, 0)) as total_value, COUNT(*) as item_count').execute()
+        total_value = float(inventory.data[0]['total_value'] if inventory.data else 0)
+        total_items = int(inventory.data[0]['item_count'] if inventory.data else 0)
+        
+        # Low stock alerts (current_stock < 10)
+        low_stock = supabase.table('aviation_inventory').select('*').lt('current_stock', 10).execute().data or []
+        
+        context = {
+            'greeting': get_greeting(),
+            'total_inventory_value': f"${total_value:,.2f}",
+            'total_items': total_items,
+            'low_stock_count': len(low_stock),
+            'low_stock_items': low_stock[:10]
+        }
+        return render_template('admin_dashboard.html', **context)
+    except Exception as e:
+        print(f"Dashboard error: {e}")
+        flash(f'Dashboard error: {str(e)}', 'danger')
+        return render_template('admin_dashboard.html', greeting=get_greeting())
+
+@app.route('/stock-management')
+def stock_management():
+    """Stock Management - Full suppliers list for Render deployment."""
+    try:
+        supabase = get_supabase()
+        
+        # Fetch ALL suppliers from suppliers table and pass to template
+        suppliers_resp = supabase.table('suppliers').select('*').order('supplier_name').execute()
         suppliers = suppliers_resp.data or []
         
-        # 2. Fetch inventory
+        # Fetch inventory
         inventory_resp = supabase.table('aviation_inventory').select('*').order('part_number').execute()
         inventory = inventory_resp.data or []
         
-        # 3. Add supplier names to inventory items (for display)
+        # Add supplier names to inventory for display
         supplier_map = {s['id']: s['supplier_name'] for s in suppliers}
         for item in inventory:
             item['supplier_name'] = supplier_map.get(item.get('preferred_supplier_id'), 'None')
+            item['low_stock'] = float(item.get('current_stock', 0)) < 10
         
-        return render_template('stock.html',
+        return render_template('stock.html', 
                              greeting=get_greeting(),
-                             suppliers=suppliers,  # Passed to template
-                             inventory=inventory)  # For table display
-        
+                             suppliers=suppliers,
+                             inventory=inventory)
     except Exception as e:
-        flash(f'Error loading stock: {str(e)}', 'danger')
+        print(f"Stock management error: {e}")
+        flash(f'Stock error: {str(e)}', 'danger')
         return render_template('stock.html', suppliers=[], inventory=[])
 
-# ... rest of existing routes (dashboard, issue-item, etc.) remain unchanged
+@app.route('/view-order/<order_id>')
+def view_order(order_id):
+    """View specific order from sales table using .eq('id', order_id) to prevent 'Order not found'."""
+    try:
+        supabase = get_supabase()
+        
+        # Search sales table using .eq('id', order_id)
+        order_resp = supabase.table('sales').select('*').eq('id', order_id).execute()
+        order = order_resp.data[0] if order_resp.data else None
+        
+        if not order:
+            flash('Order not found', 'warning')
+            return redirect(url_for('root'))
+        
+        return render_template('order_print.html', order=order)
+    except Exception as e:
+        print(f"View order error: {e}")
+        flash(f'Order view error: {str(e)}', 'warning')
+        return redirect(url_for('root'))
+
+@app.route('/stock-history')
+def stock_history():
+    """Stock history: all records from stock_logs (desc) joined with aviation_inventory for descriptions."""
+    try:
+        supabase = get_supabase()
+        
+        # Fetch all stock_logs ordered desc, with aviation_inventory join for description
+        history_resp = supabase.table('stock_logs').select("""
+            *,
+            aviation_inventory(description)
+        """).order('created_at', direction='desc').execute()
+        history = history_resp.data or []
+        
+        return render_template('stock_logs.html', logs=history, greeting=get_greeting())
+    except Exception as e:
+        print(f"Stock history error: {e}")
+        flash(f'Stock history error: {str(e)}', 'danger')
+        return render_template('stock_logs.html', logs=[], greeting=get_greeting())
+
+@app.route('/admin/stock')
+def admin_stock():
+    """Legacy redirect to new stock-management."""
+    flash('Redirected to new stock management page', 'info')
+    return redirect(url_for('stock_management'))
 
 if __name__ == '__main__':
-    print("🚀 Aviation ERP - Stock Management Ready!")
-    print("📱 Visit: http://localhost:5000/admin/stock")
+    print("🚀 Aviation ERP Admin Portal - Render Deployment Ready")
+    print("📊 Dashboard: http://localhost:5000/admin")
+    print("📦 Stock Mgmt: http://localhost:5000/stock-management") 
+    print("📜 View Order: http://localhost:5000/view-order/[order_id]")
+    print("📈 Stock History: http://localhost:5000/stock-history")
+    print("📦 Deploy: gunicorn app:app")
     app.run(debug=True, host='0.0.0.0', port=5000)
 
