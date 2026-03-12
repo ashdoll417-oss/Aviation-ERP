@@ -15,6 +15,7 @@ Django==4.2.7
 djangorestframework==3.14.0
 fastapi==0.135.1
 Flask==3.0.3
+Flask-Login==0.6.3
 fsspec==2026.2.0
 gunicorn==23.0.0
 h11==0.16.0
