@@ -732,7 +732,7 @@ async def add_item(request: Request):
         if batch_no:
             new_item["batch_no"] = batch_no
         
-        # Add expiry date if provided (validate format)
+        # Add expiry date if provided and not empty (set to None if empty)
         if expiry_date:
             # Ensure date is in YYYY-MM-DD format for Supabase
             try:
@@ -743,6 +743,8 @@ async def add_item(request: Request):
             except ValueError:
                 # If already in correct format or invalid, just store as-is
                 new_item["expiry_date"] = expiry_date
+        else:
+            new_item["expiry_date"] = None
         
         # Add barcode number if provided
         if barcode_number:

@@ -96,22 +96,23 @@ def stock_management():
         return render_template('stock.html', suppliers=[], inventory=[])
 
 @app.route('/view-order/<order_id>')
+@app.route('/print-order/<order_id>')
 def view_order(order_id):
-    """View specific order from sales table using .eq('id', order_id) to prevent 'Order not found'."""
+    """View/Print specific completed order from sales table."""
     try:
         supabase = get_supabase()
         
-        # Search sales table using .eq('id', order_id)
-        order_resp = supabase.table('sales').select('*').eq('id', order_id).execute()
-        order = order_resp.data[0] if order_resp.data else None
+        # Query sales with aviation_inventory join using .eq('id', order_id)
+        order_resp = supabase.table('sales').select('*, aviation_inventory(*)').eq('id', order_id).execute()
         
-        if not order:
-            flash('Order not found', 'warning')
+        if not order_resp.data:
+            flash('Order ID ' + order_id + ' not found in Sales table.', 'warning')
             return redirect(url_for('root'))
         
+        order = order_resp.data[0]
         return render_template('order_print.html', order=order)
     except Exception as e:
-        print(f"View order error: {e}")
+        print(f"View/Print order error: {e}")
         flash(f'Order view error: {str(e)}', 'warning')
         return redirect(url_for('root'))
 
