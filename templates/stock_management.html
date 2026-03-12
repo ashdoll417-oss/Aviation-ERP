@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Management - Aviation ERP{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="mb-8 animate-fade-in">
+    <h1 class="text-2xl font-semibold text-primary flex items-center gap-3">
+        <i class="bi bi-box-seam"></i> Stock Management
+    </h1>
+    <nav class="mt-2 text-sm text-gray-500">
+        <a href="/" class="hover:text-secondary">Dashboard</a> / <span class="text-secondary">Stock Management</span>
+    </nav>
+</div>
+
+<!-- Suppliers Dropdown for New Items -->
+<div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+    <h3 class="text-lg font-semibold text-primary mb-4">Preferred Suppliers</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {% for s in suppliers %}
+        <div class="border rounded-lg p-4 hover:shadow-md transition-shadow">
+            <h4 class="font-semibold text-gray-900 mb-1">{{ s.supplier_name }}</h4>
+            <p class="text-sm text-gray-500">ID: {{ s.id }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Inventory Table -->
+<div class="bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-4">
+        <h3 class="text-white text-lg font-semibold flex items-center gap-2">
+            <i class="bi bi-list-ul"></i> Current Inventory (aviation_inventory)
+        </h3>
+    </div>
+    {% if inventory %}
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Part Number</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Current Stock</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">UOM</th>
+                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier ID</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in inventory %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap font-mono font-semibold">{{ item.part_number or 'N/A' }}</td>
+                    <td class="px-6 py-4 max-w-md">{{ item.description or 'No description' }}</td>
+                    <td class="px-6 py-4 font-semibold text-lg text-primary">{{ item.current_stock or 0 }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ item.uom or 'N/A' }}</td>
+                    <td class="px-6 py-4">
+                        {% if item.preferred_supplier_id %}
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                {{ item.preferred_supplier_id }}
+                            </span>
+                        {% else %}
+                            <span class="px-2 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">None</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="p-12 text-center text-gray-500">
+        <i class="bi bi-inbox text-5xl mb-4 opacity-50"></i>
+        <h3 class="text-xl font-semibold mb-2">No inventory items found</h3>
+        <p>Add items using the form above or check your Supabase aviation_inventory table.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in { animation: fadeIn 0.5s ease forwards; opacity: 0; }
+</style>
+{% endblock %}

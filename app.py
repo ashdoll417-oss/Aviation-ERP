@@ -66,34 +66,20 @@ def admin_dashboard():
         flash(f'Dashboard error: {str(e)}', 'danger')
         return render_template('admin_dashboard.html', greeting=get_greeting())
 
-@app.route('/stock-management')
+@app.route('/stock-management', methods=['GET'])
 def stock_management():
-    """Stock Management - Full suppliers list for Render deployment."""
-    try:
-        supabase = get_supabase()
-        
-        # Fetch ALL suppliers from suppliers table and pass to template
-        suppliers_resp = supabase.table('suppliers').select('*').order('supplier_name').execute()
-        suppliers = suppliers_resp.data or []
-        
-        # Fetch inventory
-        inventory_resp = supabase.table('aviation_inventory').select('*').order('part_number').execute()
-        inventory = inventory_resp.data or []
-        
-        # Add supplier names to inventory for display
-        supplier_map = {s['id']: s['supplier_name'] for s in suppliers}
-        for item in inventory:
-            item['supplier_name'] = supplier_map.get(item.get('preferred_supplier_id'), 'None')
-            item['low_stock'] = float(item.get('current_stock', 0)) < 10
-        
-        return render_template('stock.html', 
-                             greeting=get_greeting(),
-                             suppliers=suppliers,
-                             inventory=inventory)
-    except Exception as e:
-        print(f"Stock management error: {e}")
-        flash(f'Stock error: {str(e)}', 'danger')
-        return render_template('stock.html', suppliers=[], inventory=[])
+    # 1. Fetch suppliers from Supabase
+    response = supabase.table('suppliers').select('id, supplier_name').execute()
+    suppliers_list = response.data  # This is the list of suppliers
+    
+    # 2. Fetch current stock to show in the table
+    stock_response = supabase.table('aviation_inventory').select('*').execute()
+    inventory = stock_response.data
+
+    # 3. PASS BOTH TO THE HTML
+    return render_template('stock_management.html', 
+                           suppliers=suppliers_list, 
+                           inventory=inventory)
 
 @app.route('/view-order/<order_id>')
 @app.route('/print-order/<order_id>')
