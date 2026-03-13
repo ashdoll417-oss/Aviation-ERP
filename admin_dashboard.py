@@ -785,18 +785,26 @@ async def add_item(request: Request):
     try:
         supabase = get_supabase_client()
         
+        # Get unit_type and color_type
+        unit_type = form_data.get("unit_type", "KG").strip()
+        color_type = form_data.get("color_type", "").strip()
+        
         # Parse values, default to 0 for current_stock, and 5 for min_threshold if blank
         try:
-            current_stock_value = float(current_stock) if current_stock else 0
+            current_stock_value = float(form_data.get("current_stock", "0")) if form_data.get("current_stock") else 0
         except ValueError:
             current_stock_value = 0
             
+        # Carpet Inches to Yards conversion (1 Yard = 36 Inches)
+        if category.lower() == 'carpet' and unit_type.lower() == 'inches':
+            current_stock_value = current_stock_value / 36  # Convert to Yards
+            
         # Default to 5 if min_threshold is blank or invalid, convert to integer
-        if not min_threshold:
-            min_threshold_value = 5
-        else:
+        min_threshold_value = 5
+        min_threshold_str = form_data.get("min_threshold", "5").strip()
+        if min_threshold_str:
             try:
-                min_threshold_value = int(min_threshold)
+                min_threshold_value = int(min_threshold_str)
             except ValueError:
                 min_threshold_value = 5
         
@@ -807,10 +815,14 @@ async def add_item(request: Request):
             "category": category,
             "current_stock": current_stock_value,
             "opening_stock": current_stock_value,
-            "uom": uom,
+            "uom": unit_type,
             "min_threshold": min_threshold_value
         }
         
+        # Add color_type if carpet
+        if category.lower() == 'carpet' and color_type:
+            new_item["color_type"] = color_type
+            
         # Add preferred supplier if selected
         if preferred_supplier_id:
             new_item["preferred_supplier_id"] = preferred_supplier_id
@@ -1215,12 +1227,12 @@ async def api_inventory():
 
 
 @app.post("/api/stock/update")
-async def update_stock(request: StockUpdateRequest):
+    async def update_stock(request: StockUpdateRequest):
     """
     API endpoint to update stock quantity.
     
     Args:
-        request: StockUpdateRequest with part_number, new_quantity, and operation
+        request: StockUpdateRequest with part_number (or barcode), new_quantity, and operation
     
     Returns:
         Success message with updated stock
@@ -1228,13 +1240,17 @@ async def update_stock(request: StockUpdateRequest):
     supabase = get_supabase_service_client()
     
     try:
-        # Get current stock
-        response = supabase.table("aviation_inventory").select("current_stock").eq("part_number", request.part_number).execute()
+        # Search by part_number OR barcode_number
+        response = supabase.table("aviation_inventory").select("id, part_number, current_stock").or_(
+            f"part_number.eq.{request.part_number},barcode_number.eq.{request.part_number}"
+        ).execute()
         
         if not response.data:
-            raise HTTPException(status_code=404, detail=f"Item not found: {request.part_number}")
+            raise HTTPException(status_code=404, detail=f"Item not found by part_number or barcode: {request.part_number}")
         
-        current_stock = float(response.data[0].get("current_stock", 0))
+        item = response.data[0]
+        item_id = item["id"]
+        current_stock = float(item.get("current_stock", 0))
         
         # Calculate new stock based on operation
         if request.operation == "set":
@@ -1249,14 +1265,14 @@ async def update_stock(request: StockUpdateRequest):
         # Update stock in database
         update_response = supabase.table("aviation_inventory").update({
             "current_stock": new_stock
-        }).eq("part_number", request.part_number).execute()
+        }).eq("id", item_id).execute()
         
         if not update_response.data:
             raise HTTPException(status_code=500, detail="Failed to update stock")
         
         return {
             "success": True,
-            "message": f"Stock updated successfully for {request.part_number}",
+            "message": f"Stock updated successfully for {item.get('part_number', request.part_number)}",
             "old_stock": current_stock,
             "new_stock": new_stock
         }
