@@ -1,1 +1,9 @@
-# Task: Add /api/stock/update endpoint to app.py at top after app = Flask(__name__)\n\n## TODO Steps\n\n- [x] 1. User approved the edit plan\n- [ ] 2. Read app.py contents\n- [ ] 3. Perform precise edit_file insertion\n- [ ] 4. Verify edit success\n- [ ] 5. Test the new endpoint\n- [ ] 6. Complete task\n
+# TODO: Fix Flask app.py for Render Production
+
+- [x] User confirmed plan
+- [ ] Create TODO.md with steps
+- [x] Edit app.py: remove duplicate bottom route
+- [x] Edit app.py: update top route (current_stock, robust parsing, OPTIONS)
+- [ ] Verify no syntax errors
+- [ ] Test command suggestion
+- [ ] Complete task

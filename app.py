@@ -22,28 +22,33 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-me')
 # Bootstrap via CDN in base.html - no flask_bootstrap needed
 
-# Place this at the TOP of app.py, right after app = Flask(__name__)
 @app.route('/api/stock/update', methods=['POST', 'OPTIONS'])
 def update_stock_api():
-    if request.method == 'OPTIONS': # Handle browser pre-flight checks
+    if request.method == 'OPTIONS':
         return '', 200
         
     try:
         data = request.get_json()
-        if not data:
-            # Fallback if the data isn't JSON
-            data = request.form
-            
+        # Look for 'new_quantity' because that's what your JS is sending!
         item_id = data.get('id')
-        new_qty = data.get('quantity')
+        part_number = data.get('part_number')
+        new_qty = data.get('new_quantity') 
         
-        # Log to the Render console so we can see it working
-        print(f"DEBUG: Updating Item {item_id} to Qty {new_qty}")
+        print(f"DEBUG: Attempting update for Part: {part_number}, New Qty: {new_qty}")
 
         supabase_client = get_supabase()
-        result = supabase_client.table('aviation_inventory').update({'quantity': new_qty}).eq('id', item_id).execute()
         
-        return jsonify({"success": True}), 200
+        # We use part_number to find the item since your JS sends it
+        result = supabase_client.table('aviation_inventory') \
+            .update({'current_stock': new_qty}) \
+            .eq('part_number', part_number) \
+            .execute()
+        
+        if result.data:
+            return jsonify({"success": True, "message": "Stock updated"}), 200
+        else:
+            return jsonify({"success": False, "message": "Product not found"}), 404
+
     except Exception as e:
         print(f"ERROR: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -236,20 +241,7 @@ def generate_barcode(part_number):
     # Returns the barcode as an image for the browser to display or print
     return send_file(buffer, mimetype='image/png')
 
-@app.route('/api/stock/update', methods=['POST'])
-def update_stock():
-    supabase = get_supabase()
-    data = request.get_json()
-    item_id = data.get('id')
-    new_quantity = data.get('quantity')
-    
-    # Update Supabase
-    result = supabase.table('aviation_inventory').update({'quantity': new_quantity}).eq('id', item_id).execute()
-    
-    if result.data:
-        return jsonify({"status": "success"}), 200
-    else:
-        return jsonify({"status": "error", "message": "Item not found"}), 404
+
 
 if __name__ == '__main__':
 
