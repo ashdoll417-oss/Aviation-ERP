@@ -85,22 +85,15 @@ def stock_management():
 @app.route('/print-order/<int:order_id>')
 def view_order(order_id):
     """View/Print specific order - integer ID from sales table."""
-    try:
-        supabase = get_supabase()
+    supabase = get_supabase()
+    
+    # This specifically looks for the numeric ID
+    res = supabase.table('sales').select('*, aviation_inventory(*)').eq('id', order_id).execute()
+    
+    if not res.data:
+        return "<h3>Error: Order not found in database.</h3><a href='/completed-orders'>Back to Orders</a>", 404
         
-        # Use integer ID to find sale
-        result = supabase.table('sales').select('*, aviation_inventory(*)').eq('id', order_id).execute()
-        
-        if not result.data:
-            flash(f'Order ID {order_id} not found.', 'warning')
-            return redirect(url_for('root'))
-        
-        order = result.data[0]
-        return render_template('order_print.html', order=order)
-    except Exception as e:
-        print(f"View/Print order error: {e}")
-        flash(f'Order view error: {str(e)}', 'warning')
-        return redirect(url_for('root'))
+    return render_template('order_print.html', order=res.data[0])
 
 @app.route('/stock-history')
 def stock_history():
@@ -134,7 +127,49 @@ def admin_stock():
     flash('Redirected to new stock management page', 'info')
     return redirect(url_for('stock_management'))
 
+@app.route('/quote-generator', methods=['GET'])
+def quote_generator():
+    """Quote Generator - explicitly fetch all aviation_inventory for dropdowns."""
+    try:
+        supabase = get_supabase()
+        
+        # Fetch all items so 745XA and others show up in the dropdown
+        inventory_res = supabase.table('aviation_inventory').select('*').execute()
+        
+        # Fetch all suppliers for the dropdown
+        suppliers_res = supabase.table('suppliers').select('*').execute()
+        
+        return render_template('quote_generator.html', 
+                               inventory=inventory_res.data or [],
+                               suppliers=suppliers_res.data or [],
+                               greeting=get_greeting())
+    except Exception as e:
+        print(f"Quote generator error: {e}")
+        flash(f'Quote generator error: {str(e)}', 'danger')
+        return render_template('quote_generator.html', inventory=[], suppliers=[], greeting=get_greeting())
+
+@app.route('/usage-reports')
+def usage_reports():
+    """Usage Reports Route: Query sales table, join inventory, render template w/ report_data (no JSON)."""
+    try:
+        supabase = get_supabase()
+        
+        # Query the sales table and join with inventory
+        res = supabase.table('sales').select('*, aviation_inventory(part_number, description)').execute()
+        
+        if not res.data:
+            return render_template('usage_reports.html', report_data=[])
+
+        # Pass the actual data list, NOT a jsonify() object
+        return render_template('usage_reports.html', report_data=res.data)
+    except Exception as e:
+        print(f"Usage reports error: {e}")
+        flash(f'Usage reports error: {str(e)}', 'danger')
+        return render_template('usage_reports.html', report_data=[])
+
 if __name__ == '__main__':
+
+
     print("🚀 Aviation ERP Admin Portal - Render Deployment Ready")
     print("📊 Dashboard: http://localhost:5000/admin")
     print("📦 Stock Mgmt: http://localhost:5000/stock-management") 
