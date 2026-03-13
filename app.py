@@ -29,23 +29,26 @@ def update_stock_api():
         
     try:
         data = request.get_json()
-        # Look for 'new_quantity' because that's what your JS is sending!
+        if not data:
+            data = request.form
+            
+        # Get both just in case
         item_id = data.get('id')
         part_number = data.get('part_number')
         new_qty = data.get('new_quantity') 
         
-        print(f"DEBUG: Attempting update for Part: {part_number}, New Qty: {new_qty}")
+        print(f"DEBUG: Attempting update for Part: {part_number} (ID: {item_id}), New Qty: {new_qty}")
 
         supabase_client = get_supabase()
         
-        # We use part_number to find the item since your JS sends it
-        result = supabase_client.table('aviation_inventory') \
-            .update({'current_stock': new_qty}) \
-            .eq('part_number', part_number) \
-            .execute()
+        # We try to update by ID if it exists, otherwise use part_number
+        if item_id:
+            result = supabase_client.table('aviation_inventory').update({'current_stock': new_qty}).eq('id', item_id).execute()
+        else:
+            result = supabase_client.table('aviation_inventory').update({'current_stock': new_qty}).eq('part_number', part_number).execute()
         
         if result.data:
-            return jsonify({"success": True, "message": "Stock updated"}), 200
+            return jsonify({"success": True}), 200
         else:
             return jsonify({"success": False, "message": "Product not found"}), 404
 
