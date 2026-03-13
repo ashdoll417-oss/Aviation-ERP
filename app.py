@@ -180,4 +180,4 @@ if __name__ == '__main__':
 
 @app.route('/api/stock/update', methods=['POST', 'OPTIONS'], strict_slashes=False)
 def stock_update_alias():
-    return update_stock_v2()
+    return stock_update()
