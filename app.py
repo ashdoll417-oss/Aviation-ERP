@@ -1,4 +1,5 @@
 """
+# Deployment Sync: 2026-03-13
 Aviation ERP Admin Portal - Professional Flask + Supabase
 Tables: aviation_inventory, suppliers, sales, stock_logs
 Features: Dashboard metrics, Issue Item (atomic), Stock w/ Suppliers dropdown, Order View, Stock History
@@ -22,36 +23,41 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-change-me')
 # Bootstrap via CDN in base.html - no flask_bootstrap needed
 
-@app.route('/api/stock/update', methods=['POST', 'OPTIONS'])
-def update_stock_api():
+@app.route('/api/stock/v2/update', methods=['POST', 'OPTIONS'], strict_slashes=False)
+def update_stock_v2():
     if request.method == 'OPTIONS':
         return '', 200
-        
-    try:
-        data = request.get_json()
-        if not data:
-            data = request.form
-            
-        # Get both just in case
-        item_id = data.get('id')
-        part_number = data.get('part_number')
-        new_qty = data.get('new_quantity') 
-        
-        print(f"DEBUG: Attempting update for Part: {part_number} (ID: {item_id}), New Qty: {new_qty}")
 
+    print("DEBUG: Incoming request to /api/stock/v2/update")
+    
+    try:
+        data = request.get_json() or request.form or {}
+        print(f"DEBUG: Incoming data: {data}")
+        
+        part_number = data.get('part_number')
+        if not part_number:
+            print("ERROR: Missing part_number")
+            return jsonify({"success": False, "error": "part_number is required"}), 400
+        
+        new_quantity = data.get('new_quantity') or data.get('quantity') or data.get('qty') or 0
+        print(f"DEBUG: Updating part_number='{part_number}' to current_stock={new_quantity}")
+        
+        if new_quantity == 0 and not data.get('new_quantity'):
+            print("WARNING: No valid quantity provided")
+        
         supabase_client = get_supabase()
         
-        # We try to update by ID if it exists, otherwise use part_number
-        if item_id:
-            result = supabase_client.table('aviation_inventory').update({'current_stock': new_qty}).eq('id', item_id).execute()
-        else:
-            result = supabase_client.table('aviation_inventory').update({'current_stock': new_qty}).eq('part_number', part_number).execute()
+        print("DEBUG: Executing Supabase update...")
+        result = supabase_client.table('aviation_inventory').update({'current_stock': new_quantity}).eq('part_number', part_number).execute()
+        print(f"DEBUG: Database response: {result}")
         
         if result.data:
-            return jsonify({"success": True}), 200
+            print("DEBUG: Update successful")
+            return jsonify({"success": True, "message": "Stock updated successfully"}), 200
         else:
-            return jsonify({"success": False, "message": "Product not found"}), 404
-
+            print("WARNING: No rows updated - part_number not found")
+            return jsonify({"success": False, "message": "Part number not found"}), 404
+            
     except Exception as e:
         print(f"ERROR: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
