@@ -1,13 +1,7 @@
-# Aviation ERP Updates - Route Enhancements
+# Aviation ERP Updates - Fix Stock Management & Purchase Orders
 
-## Plan Implementation Steps
-
-### 1. [x] Create TODO.md
-### 2. [x] Update app.py stock_history(): Added search (?search=query) with part_number ilike + aviation_inventory join
-### 3. [x] Dropdowns: Confirmed complete in admin_dashboard.py (/purchase-orders, /quote)
-### 4. [x] Usage Reports JSON fix: Updated view_order route for graceful not-found handling
-### 5. [x] Test command provided
-### 6. [x] Complete task ✓
-
-**Final Status**: All requested updates implemented and verified.
-**Test**: `python app.py` → /stock-history?search=745XA works with descriptions.
+## Plan Steps:
+- [x] Step 1: Replace stock-management route with combined manage_stock_and_po route for /purchase-order and /stock-management
+- [x] Step 2: Replace view-order route with new version using <order_id>, view_order.html template
+- [x] Step 3: Test routes locally (run python app.py, visit /purchase-order, /stock-management, /view-order/{id})
+- [x] Step 4: Complete

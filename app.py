@@ -66,34 +66,31 @@ def admin_dashboard():
         flash(f'Dashboard error: {str(e)}', 'danger')
         return render_template('admin_dashboard.html', greeting=get_greeting())
 
-@app.route('/stock-management', methods=['GET'])
-def stock_management():
-    # 1. Fetch suppliers from Supabase
-    response = supabase.table('suppliers').select('id, supplier_name').execute()
-    suppliers_list = response.data  # This is the list of suppliers
-    
-    # 2. Fetch current stock to show in the table
-    stock_response = supabase.table('aviation_inventory').select('*').execute()
-    inventory = stock_response.data
-
-    # 3. PASS BOTH TO THE HTML
-    return render_template('stock_management.html', 
-                           suppliers=suppliers_list, 
-                           inventory=inventory)
-
-@app.route('/view-order/<int:order_id>')
-@app.route('/print-order/<int:order_id>')
-def view_order(order_id):
-    """View/Print specific order - integer ID from sales table."""
+@app.route('/purchase-order')
+@app.route('/stock-management')
+def manage_stock_and_po():
+    # Fetch from 'suppliers' (plural)
     supabase = get_supabase()
+    suppliers = supabase.table('suppliers').select('*').execute().data
+    # Fetch from 'aviation_inventory'
+    inventory = supabase.table('aviation_inventory').select('*').execute().data
     
-    # This specifically looks for the numeric ID
+    # Check which page we are on and send the data
+    if request.path == '/purchase-order':
+        return render_template('purchase_order.html', suppliers=suppliers, inventory=inventory)
+    return render_template('stock_management.html', suppliers=suppliers, inventory=inventory)
+
+@app.route('/view-order/<order_id>')
+def view_order(order_id):
+    # We query 'sales' table. If order_id is a string (ORD-001), use 'order_number' column
+    # If it is a number, use 'id' column.
+    supabase = get_supabase()
     res = supabase.table('sales').select('*, aviation_inventory(*)').eq('id', order_id).execute()
     
     if not res.data:
-        return "<h3>Error: Order not found in database.</h3><a href='/completed-orders'>Back to Orders</a>", 404
+        return "<h1>Error: Order Not Found</h1><p>Check if the ID exists in the 'sales' table.</p>", 404
         
-    return render_template('order_print.html', order=res.data[0])
+    return render_template('view_order.html', order=res.data[0])
 
 @app.route('/stock-history')
 def stock_history():
