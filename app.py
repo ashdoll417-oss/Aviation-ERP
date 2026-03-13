@@ -211,22 +211,19 @@ def generate_barcode(part_number):
     return send_file(buffer, mimetype='image/png')
 
 @app.route('/api/stock/update', methods=['POST'])
-def update_stock_api():
-    try:
-        supabase = get_supabase()
-        data = request.json
-        item_id = data.get('id')
-        new_qty = data.get('quantity')
-
-        # Update the 'aviation_inventory' table in Supabase
-        result = supabase.table('aviation_inventory').update({"quantity": new_qty}).eq('id', item_id).execute()
-
-        if result.data:
-            return jsonify({"success": True, "message": "Stock updated"}), 200
-        else:
-            return jsonify({"success": False, "message": "Item not found in database"}), 404
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+def update_stock():
+    supabase = get_supabase()
+    data = request.get_json()
+    item_id = data.get('id')
+    new_quantity = data.get('quantity')
+    
+    # Update Supabase
+    result = supabase.table('aviation_inventory').update({'quantity': new_quantity}).eq('id', item_id).execute()
+    
+    if result.data:
+        return jsonify({"status": "success"}), 200
+    else:
+        return jsonify({"status": "error", "message": "Item not found"}), 404
 
 if __name__ == '__main__':
 
